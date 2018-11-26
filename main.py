@@ -15,6 +15,8 @@ class Main:
         self.scr_rect = Rect(0, 0, self.width, self.height)
         self.screen = pygame.display.set_mode(self.scr_rect.size,
                                               pygame.HWSURFACE | pygame.DOUBLEBUF)
+        self.playSizeX = self.width - 150
+        self.play_rect = Rect(0, 0, self.playSizeX, self.height)
         self.menuInit()
         self.variableInit()
         self.menu(self.startingMenu)
@@ -60,21 +62,27 @@ class Main:
         self.inMenu = True
         self.current_selection = 1
         self.num_choices = 0
+        self.score = 0
         # TODO Boss stamina bar
         self.staminaBarMax = self.staminaBarCur = self.width * 4/5
         self.current_menu = self.startingMenu
         self.playing = False
         self.playerBulletData = {"vel": -20, "radius": 2}
-        self.playerData = {"lives": 3, "vel": 5,"bulletData":self.playerBulletData}
+        self.playerData = {"lives": 3, "velFast": 5, "velSlow": 2,
+                           "bulletData": self.playerBulletData, "radius": 5}
         self.clock = pygame.time.Clock()
         self.hitboxGroup = pygame.sprite.Group()
         self.playerReprGroup = pygame.sprite.Group()
         self.playerBulletGroup = pygame.sprite.Group()
         self.monsterGroup = pygame.sprite.Group()
         self.monsterBulletGroup = pygame.sprite.Group()
+        self.sidebar = pygame.sprite.RenderPlain(
+            sprites.SideBar((self.width - 75, (self.height) / 2),
+                            pygame.Surface((150, self.height))))
 
     def eventListener(self, event):
         pygame.event.pump()
+        # print(pygame.key.get_mods())
         if event.type == pygame.QUIT:
             self._running = False
         elif self.inMenu and event.type == KEYDOWN:
@@ -97,6 +105,7 @@ class Main:
             self.playerHitbox.keyDown(event.key)
         elif self.playing and event.type == KEYUP and self.playerHitbox.movable:
             self.playerHitbox.keyUp(event.key)
+        pygame.display.update()
 
     def initGame(self):
         print("init Game...")
@@ -124,7 +133,6 @@ class Main:
                 if monsterBullets is not None:
                     for b in monsterBullets:
                         self.monsterBulletGroup.add(b)
-                print(self.monsterBulletGroup)
             if monster.stamina < 1:
                 # TODO fix this, delete all bullets
                 # for b in self.monsterBulletGroup:
@@ -133,11 +141,15 @@ class Main:
                 self.monsterBulletGroup.empty()
 
         self.playerBulletGroup.update()
-        self.monsterBulletGroup.update(self.scr_rect)
-        self.playerHitbox.update(self.scr_rect,self.monsterBulletGroup)
-        self.playerRepr.update(self.scr_rect, self.playerHitbox.deltaMoveX,
+        self.monsterBulletGroup.update(self.play_rect)
+        self.playerHitbox.update(self.play_rect, self.monsterBulletGroup)
+        self.playerRepr.update(self.play_rect, self.playerHitbox.deltaMoveX,
                                self.playerHitbox.deltaMoveY)
-        self.monsterGroup.update(self.playerBulletGroup)
+        hitcount = [0]
+        self.monsterGroup.update(self.playerBulletGroup, hitcount)
+        if hitcount[0] > 0:
+            self.score += hitcount[0]
+        self.sidebar.update(1, self.score, 3)
         self.inGameDraw()
         if self.playerHitbox.dead:
             self.__init__()
@@ -153,7 +165,11 @@ class Main:
             self.monsterGroup.draw(self.screen)
             # stamina bar
             if self.staminaBarCur >0:
-                pygame.draw.rect(self.screen,(150,15,0),[self.width//20,self.width//20,self.width*0.9*self.staminaBarCur/self.staminaBarMax,2])
+                pygame.draw.rect(self.screen, (150, 15, 0),
+                                 [self.playSizeX // 20, self.playSizeX // 20,
+                                  self.playSizeX * 0.9 * self.staminaBarCur / self.staminaBarMax,
+                                  2])
+            self.sidebar.draw(self.screen)
 
 
 
@@ -161,13 +177,23 @@ class Main:
         # cX, cY = pos
 
         # Hitbox
-        playerHitBoxImg = pygame.Surface((10, 10), pygame.SRCALPHA)
-        pygame.draw.ellipse(playerHitBoxImg, (255, 255, 255), [0, 0, 10, 10],
-                            0)
-        pygame.draw.ellipse(playerHitBoxImg, (255, 0, 0), [0, 0, 10, 10], 2)
-        # pygame.gfxdraw.aacircle(playerHitBoxImg, pos[0], pos[1], 3, (255, 2, 2))
-        # pygame.gfxdraw.filled_circle(playerHitBoxImg, pos[0], pos[1], 3, (255, 2, 2))
-        self.playerHitbox = sprites.PlayerHitBox(pos, playerHitBoxImg,
+        radius = self.playerData["radius"]
+        playerHitBoxImgOrigin = pygame.Surface((radius * 2, radius * 2),
+                                               pygame.SRCALPHA)
+        self.playerData["playerHitBoxImgOrigin"] = playerHitBoxImgOrigin
+        playerHitBoxImg = pygame.Surface((radius * 2, radius * 2),
+                                         pygame.SRCALPHA)
+        # pygame.gfxdraw.filled_circle(playerHitBoxImg, radius, radius, radius, (255, 2, 2))
+        # pygame.gfxdraw.filled_circle(playerHitBoxImg, radius, radius, radius-2, (255, 255, 255))
+        pygame.draw.ellipse(playerHitBoxImg, (255, 0, 0),
+                            [0, 0, radius * 2, radius * 2], 0)
+        pygame.draw.ellipse(playerHitBoxImg, (255, 255, 255),
+                            [2, 2, radius * 2 - 4, radius * 2 - 4], 0)
+        pygame.gfxdraw.filled_circle(playerHitBoxImg, pos[0], pos[1], 3,
+                                     (255, 2, 2))
+        self.playerData["playerHitBoxImgTrans"] = playerHitBoxImg
+        self.playerHitbox = sprites.PlayerHitBox(pos, self.playerData[
+            "playerHitBoxImgOrigin"],
                                                  self.playerData)
 
         # player repr
@@ -181,20 +207,16 @@ class Main:
         self.playerHitbox.movable = True
 
     def enemySpawn(self):
+        # stage 1
         stage1 = levels.Stage1()
-        monsterReprImg = pygame.Surface((40, 40), pygame.SRCALPHA)
-        monsterReprImg.fill((0,0,0))
-        pygame.draw.rect(monsterReprImg,(255,255,255),(0,0,40,40),1)
-        stage1Monster = sprites.Monster((self.width/2,100),monsterReprImg,stage1.monsterData)
+        monsterReprImg = stage1.monsterReprImg
+        # pygame.draw.rect(monsterReprImg,(255,255,255),(0,0,40,40),1)
+        stage1Monster = sprites.Monster((self.playSizeX / 2, 100),
+                                        monsterReprImg, stage1.monsterData)
         self.monsterGroup.add(stage1Monster)
         self.staminaBarCur = self.staminaBarMax = stage1.monsterData["stamina"]
 
 
-    def on_loop(self):
-        pass
-
-    def on_render(self):
-        pass
 
     def on_cleanup(self):
         sys.exit()
@@ -203,8 +225,6 @@ class Main:
         while (self._running):
             for event in pygame.event.get():
                 self.eventListener(event)
-            # self.on_loop()
-            # self.on_render()
             if self.inMenu:
                 pygame.display.flip()
             if self.playing:
