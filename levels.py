@@ -44,8 +44,12 @@ class Stage1(Stage):
     def __init__(self):
         Stage.__init__(self, 1)
         # self.monsterSpawns = 2
+        monsterSpellScripts = ["scripts/1_1.xml"]
         monsterBulletData = {"radius": 10, "color": (255, 255, 255), "vel": 5,
-                             "fireRate": 8, "fontSize": 11}
-        self.monsterData = {"stamina": 100, "moveFunc": None,
+                             "fireRate": 50, "fontSize": 15,
+                             "scripts": monsterSpellScripts}
+        self.monsterData = {"stamina": 300, "moveFunc": None,
                             "bulletData": monsterBulletData, "name": "I",
                             "stageName": "Data and Expressions\nFunctions\nConditionals"}
+        self.playerBulletData = {"fireRate": 1, "fastAngleList": (-10, 10),
+                                 "slowAngleList": (0, 0)}

@@ -5,7 +5,7 @@ from pygame.locals import *
 import math
 import string
 import copy
-
+import bulletml
 
 class Sprite(pygame.sprite.Sprite):
 
@@ -19,12 +19,35 @@ class Sprite(pygame.sprite.Sprite):
 class PlayerRepr(Sprite):
     def __init__(self, centerPoint, image):
         Sprite.__init__(self, centerPoint, image)
+        self.originImg = image.copy()
+        self.playerReprImg = image.copy()
+        self.playerReprImgTrans = image.copy()
+        self.playerReprPolyPts = [(10, 13), (10, 2), (1, 20), (7, 24),
+                                  (10, 24), (10, 19)]
+        self.playerReprImgLeft = pygame.Surface((13, 26), pygame.SRCALPHA)
+        self.playerReprPoly1 = pygame.draw.aalines(self.playerReprImgLeft,
+                                                   (255, 255, 255), False,
+                                                   self.playerReprPolyPts)
+        self.playerReprImgRight = pygame.transform.flip(self.playerReprImgLeft,
+                                                        True,
+                                                        False)
+        self.playerReprImg.blit(self.playerReprImgLeft, (0, 0))
+        self.playerReprImg.blit(self.playerReprImgRight, (13, 0))
+        pygame.gfxdraw.circle(self.playerReprImg, 13, 16, 4, (255, 255, 255))
+        self.image = self.playerReprImg
 
-    def update(self, scr_size, xMove=0, yMove=0):
+        self.playerReprImgTrans.blit(self.playerReprImgLeft, (1, 0))
+        self.playerReprImgTrans.blit(self.playerReprImgRight, (12, 0))
+
+    def update(self, scr_size, xMove=0, yMove=0, trans=False):
+        if trans and self.image == self.playerReprImg:
+            self.image = self.playerReprImgTrans
+        elif (not trans) and self.image == self.playerReprImgTrans:
+            self.image = self.playerReprImg
         self.rect.move_ip(xMove, yMove)
         # TODO fix this
         self.rect.clamp_ip(
-            pygame.Rect(-5, -5, scr_size.width + 10, scr_size.height + 10))
+            pygame.Rect(-8, -11, scr_size.width + 16, scr_size.height + 16))
 
 
 class PlayerHitBox(Sprite):
@@ -111,19 +134,54 @@ class PlayerHitBox(Sprite):
                                 [0, 0, self.bulletData["radius"] * 2,
                                  self.bulletData["radius"] * 2], 0)
             # pygame.gfxdraw.filled_circle(playerBulletImg, self.bulletData["radius"], self.bulletData["radius"], self.bulletData["radius"], (255, 255, 255))
-            return PlayerBullet(ctrpt, playerBulletImg, self.bulletData)
+
+            bulletPosLst = self.getBulletPos()
+            bulletList = []
+            for i in range(len(bulletPosLst)):
+                bulletData = copy.deepcopy(self.bulletData)
+                if self.transform:
+                    bulletData["angle"] = self.bulletData["slowAngleList"][i]
+                else:
+                    bulletData["angle"] = self.bulletData["fastAngleList"][i]
+                newBullet = PlayerBullet(bulletPosLst[i], playerBulletImg,
+                                         bulletData)
+                bulletList.append(newBullet)
+            return bulletList
+
+    def getBulletPos(self):
+        if not self.transform:
+            lst = self.bulletData["fastAngleList"]
+        else:
+            lst = self.bulletData["slowAngleList"]
+        returnLst = []
+        offset = 2
+        if len(lst) % 2 > 0 and 0 in lst:
+            returnLst.append(self.rect.center)
+            offset = 4
+        for i in reversed(range(len(lst) // 2)):
+            if lst[i] == 0:
+                returnLst.insert(0, (
+                self.rect.centerx - offset, self.rect.centery))
+                returnLst.append(
+                    (self.rect.centerx + offset, self.rect.centery))
+                offset += 4
+            else:
+                returnLst.insert(0, self.rect.center)
+                returnLst.append(self.rect.center)
+        return returnLst
 
 
 class PlayerBullet(Sprite):
     def __init__(self, centerPoint, image, data):
         Sprite.__init__(self, centerPoint, image)
-        self.deltaMoveX = 0
-        self.deltaMoveY = 0
         self.vel = data["vel"]
         self.radius = data["radius"]
+        self.angle = data["angle"]
+        self.deltaMoveX = math.cos(math.radians(self.angle + 90)) * self.vel
+        self.deltaMoveY = - math.sin(math.radians(self.angle + 90)) * self.vel
 
     def update(self):
-        self.rect.move_ip(self.deltaMoveX, self.deltaMoveY + self.vel)
+        self.rect.move_ip(self.deltaMoveX, self.deltaMoveY)
         if self.rect.bottom < 0:
             self.kill()
 
@@ -139,11 +197,11 @@ class Monster(Sprite):
         self.bulletCount = 0
         self.shootCoolDown = self.shootCoolDownCur = self.bulletData[
             "fireRate"]
-        # TODO integrate this into data
-        self.angle = 90
-        self.angleIncrement = 10
+        self.target = bulletml.Bullet()
+        self.target.x, self.target.y = self.rect.centerx, self.rect.centery + 200
+        self.bulletMLInit()
 
-    def update(self, bullets, hitcount):
+    def update(self, bullets, hitcount, monsterBulletGroup, hitBoxPos):
         if self.stamina < 1:
             self.shooting = False
             self.kill()
@@ -157,42 +215,117 @@ class Monster(Sprite):
                 self.shooting = False
             # bullet hit monster
             for b in pygame.sprite.spritecollide(self, bullets, False):
-                self.stamina = max(0, self.stamina - 0.3)
+                self.stamina = max(0, self.stamina - 0.5)
                 b.kill()
                 hitcount[0] += 1
+
+            self.target.x, self.target.y = hitBoxPos
+            for obj in list(self.bulletMLActive):
+                new = obj.step()
+                # TODO where to put this:
+                # self.bulletMLActive.update(new)
+                if new:
+                    for n in new:
+                        if not n.vanished:
+                            n.repr = self.getBulletRepr()
+                            n.repr.rect.center = (n.x, n.y)
+                    if not monsterBulletGroup.has(n.repr):  # can be deleted?
+                        monsterBulletGroup.add(n.repr)
+
+                self.bulletMLActive.update(new)
+                if (obj.finished or not (-50 < obj.x < 600) or not (
+                        -50 < obj.y < 600)):
+                    self.bulletMLActive.remove(obj)
+                    try:
+                        monsterBulletGroup.remove(obj.repr)
+                    except:
+                        print("remove failure!")
+                else:
+                    # if obj.repr is None:
+                    #     obj.repr = self.getBulletRepr()
+                    if not obj.vanished:
+                        obj.repr.rect.center = (obj.x, obj.y)
+
+    def bulletMLInit(self):
+        cx, cy, width, height = self.rect
+        cx += width / 2
+        cy += height / 2
+        ctrpt = cx, cy
+        script = self.bulletData["scripts"][0]
+        self.bulletMLDoc = bulletml.BulletML.FromDocument(open(script, "rU"))
+        self.bulletMLActive = set()
+
+    def bulletMLShoot(self):
+        self.bulletMLSource = bulletml.Bullet.FromDocument(self.bulletMLDoc,
+                                                           x=self.rect.centerx,
+                                                           y=self.rect.centery,
+                                                           target=self.target,
+                                                           rank=0.2)
+        # self.bulletMLSource.repr = self.getBulletRepr()
+        self.bulletMLSource.vanished = True
+        self.bulletMLActive.add(self.bulletMLSource)
+        # return self.target, self.bulletMLActive
+
+    def getBulletRepr(self):
+        x, y, width, height = self.rect
+        x += width / 2
+        y += height / 2
+        ctrpt = x, y
+        monsterBulletImg = pygame.Surface(
+            (self.bulletData["radius"] * 2, self.bulletData["radius"] * 2),
+            pygame.SRCALPHA)
+        pygame.draw.ellipse(monsterBulletImg, (255, 255, 255),
+                            [0, 0, self.bulletData["radius"] * 2,
+                             self.bulletData["radius"] * 2], 1)
+        # bullet text
+        # font = pygame.font.Font("./fonts/monotxt.ttf",
+        #                         self.bulletData["fontSize"])
+        font = pygame.font.Font(None, self.bulletData["fontSize"])
+        text = font.render(random.choice(string.ascii_uppercase), True,
+                           (255, 255, 255))
+        self.bulletData["text"] = text
+        return MonsterBullet(ctrpt, monsterBulletImg, self.bulletData)
 
     def shoot(self):
         if self.stamina < 1:
             self.shooting = False
             return None
-        else:
-            x, y, width, height = self.rect
-            x += width / 2
-            y += height / 2
-            ctrpt = x, y
-            monsterBulletImg = pygame.Surface(
-                (self.bulletData["radius"] * 2, self.bulletData["radius"] * 2),
-                pygame.SRCALPHA)
-            pygame.draw.ellipse(monsterBulletImg, (255, 255, 255),
-                                [0, 0, self.bulletData["radius"] * 2,
-                                 self.bulletData["radius"] * 2], 1)
-            # bullet text
-            font = pygame.font.Font("./fonts/monotxt.ttf",
-                                    self.bulletData["fontSize"])
-            text = font.render(random.choice(string.ascii_uppercase), True,
-                               (255, 255, 255))
-            self.bulletData["text"] = text
-            # TODO fix this
-            self.angle = (self.angle + self.angleIncrement) % 360
-            self.bulletData["angle"] = self.angle
-            bullets = []
-            division = 4
-            for i in range(division):
-                self.bulletData["angle"] += 360 // division
-                bullets.append(
-                    MonsterBullet(ctrpt, monsterBulletImg, self.bulletData))
-            self.bulletData["angle"] = self.angle
-            return tuple(bullets)
+        elif not self.bulletMLActive:
+            self.bulletMLShoot()
+            # bullets = []
+            # for obj in self.bulletMLActive:
+            #     if obj.repr is None:
+            #         obj.repr = self.getBulletRepr()
+            #         obj.repr.rect.center = (obj.x, obj.y)
+            #     bullets.append(obj)
+
+            # x, y, width, height = self.rect
+            # x += width / 2
+            # y += height / 2
+            # ctrpt = x, y
+            # monsterBulletImg = pygame.Surface(
+            #     (self.bulletData["radius"] * 2, self.bulletData["radius"] * 2),
+            #     pygame.SRCALPHA)
+            # pygame.draw.ellipse(monsterBulletImg, (255, 255, 255),
+            #                     [0, 0, self.bulletData["radius"] * 2,
+            #                      self.bulletData["radius"] * 2], 1)
+            # # bullet text
+            # font = pygame.font.Font("./fonts/monotxt.ttf",
+            #                         self.bulletData["fontSize"])
+            # text = font.render(random.choice(string.ascii_uppercase), True,
+            #                    (255, 255, 255))
+            # self.bulletData["text"] = text
+            # # TODO fix this
+            # self.angle = (self.angle + self.angleIncrement) % 360
+            # self.bulletData["angle"] = self.angle
+            # bullets = []
+            # division = 4
+            # for i in range(division):
+            #     self.bulletData["angle"] += 360 // division
+            #     bullets.append(
+            #         MonsterBullet(ctrpt, monsterBulletImg, self.bulletData))
+            # self.bulletData["angle"] = self.angle
+            # return tuple(bullets)
 
 
 class MonsterBullet(Sprite):
@@ -202,19 +335,19 @@ class MonsterBullet(Sprite):
         self.deltaMoveY = 0
         self.vel = data["vel"]
         self.radius = data["radius"]
-        self.angle = data["angle"]
+        # self.angle = data["angle"]
         self.text = data["text"]
         self.tx = (1 - 2 ** 0.5 / 2) * self.rect.width + 1
         self.ty = (1 - 2 ** 0.5 / 2) * self.rect.height
         self.image.blit(self.text, (self.tx, self.ty))
-        self.deltaMoveX = round(self.vel * math.cos(math.radians(self.angle)))
-        self.deltaMoveY = round(self.vel * math.sin(math.radians(self.angle)))
+        # self.deltaMoveX = round(self.vel * math.cos(math.radians(self.angle)))
+        # self.deltaMoveY = round(self.vel * math.sin(math.radians(self.angle)))
 
     def pattern(self):
         pass
 
     def update(self, scr_rect):
-        self.rect.move_ip(self.deltaMoveX, self.deltaMoveY)
+        # self.rect.move_ip(self.deltaMoveX, self.deltaMoveY)
         if self.rect.bottom < 0 or self.rect.top > scr_rect.size[
             1] or self.rect.left > scr_rect.size[0] or self.rect.right < 0:
             self.kill()
@@ -244,3 +377,8 @@ class SideBar(Sprite):
         self.image.blit(text, (20, 40))
         text = font.render("Score: %s" % self.score, True, (255, 255, 255))
         self.image.blit(text, (20, 100))
+
+
+class StaminaBar(Sprite):
+    def __init__(self, centerPoint, image):
+        Sprite.__init__(self, centerPoint, image)

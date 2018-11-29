@@ -4,7 +4,10 @@ import sys
 import sprites
 import pygame.gfxdraw
 import levels
+import bulletml
+import libs.PAdLib.particles as particles
 # code reference: https://www.pygame.org/project/937/1620
+# TODO implement bulletml, cocos, PAdLib
 
 class Main:
     def __init__(self):
@@ -14,11 +17,12 @@ class Main:
         self.size = self.width, self.height = 640, 480
         self.scr_rect = Rect(0, 0, self.width, self.height)
         self.screen = pygame.display.set_mode(self.scr_rect.size,
-                                              pygame.HWSURFACE | pygame.DOUBLEBUF)
+                                              pygame.DOUBLEBUF)
         self.playSizeX = self.width - 150
         self.play_rect = Rect(0, 0, self.playSizeX, self.height)
         self.menuInit()
         self.variableInit()
+        self.particleInit()
         self.menu(self.startingMenu)
 
     def menuInit(self):
@@ -63,11 +67,13 @@ class Main:
         self.current_selection = 1
         self.num_choices = 0
         self.score = 0
+        self.clockTick = 60
         # TODO Boss stamina bar
         self.staminaBarMax = self.staminaBarCur = self.width * 4/5
         self.current_menu = self.startingMenu
         self.playing = False
-        self.playerBulletData = {"vel": -20, "radius": 2}
+        # TODO implement player shooting rate according to stage
+        self.playerBulletData = {"vel": 20, "radius": 2, "fireRate": 2}
         self.playerData = {"lives": 3, "velFast": 5, "velSlow": 2,
                            "bulletData": self.playerBulletData, "radius": 5}
         self.clock = pygame.time.Clock()
@@ -79,6 +85,32 @@ class Main:
         self.sidebar = pygame.sprite.RenderPlain(
             sprites.SideBar((self.width - 75, (self.height) / 2),
                             pygame.Surface((150, self.height))))
+        self.frameCount = 0
+
+    def particleInit(self):
+        # particle
+        self.particleSystem = particles.ParticleSystem()
+        self.particleSystem.set_particle_acceleration([0.0, 20.0])
+
+        self.playerDieEmitter = particles.Emitter()
+        self.playerDieEmitter.set_density(0)
+        self.playerDieEmitter.set_angle(0.0, 360.0)
+        self.playerDieEmitter.set_speed([10.0, 200.0])
+        self.playerDieEmitter.set_life([0.5, 1])
+        self.playerDieEmitter.set_colors([(255, 255, 255)])
+
+        self.bossDieEmitter = particles.Emitter()
+        self.bossDieEmitter.set_density(0)
+        self.bossDieEmitter.set_angle(0.0, 360.0)
+        self.bossDieEmitter.set_speed([10.0, 200.0])
+        self.bossDieEmitter.set_life([0.5, 0.8])
+        self.bossDieEmitter.set_colors([(255, 255, 255)])
+
+        self.particleSystem.add_emitter(self.playerDieEmitter,
+                                        "playerDieEmitter")
+        self.particleSystem.add_emitter(self.bossDieEmitter, "bossDieEmitter")
+
+
 
     def eventListener(self, event):
         pygame.event.pump()
@@ -121,12 +153,14 @@ class Main:
 
 
     def inGameUpdate(self):
-        self.clock.tick(60)
-        if self.playerHitbox.shooting:
-            playerBullet = self.playerHitbox.shoot()
-            if playerBullet is not None:
-                self.playerBulletGroup.add(playerBullet)
+        self.clock.tick(self.clockTick)
+        if self.playerHitbox.shooting:  # and self.frameCount % self.playerBulletData["fireRate"]==0:
+            playerBullets = self.playerHitbox.shoot()
+            for b in playerBullets:
+                if b is not None:
+                    self.playerBulletGroup.add(b)
         for monster in self.monsterGroup:
+            monster.target.x, monster.target.y = self.playerHitbox.rect.center
             self.staminaBarCur = monster.stamina
             if monster.shooting:
                 monsterBullets = monster.shoot()
@@ -139,18 +173,34 @@ class Main:
                 #     b.kill()
                 self.staminaBarCur = 0
                 self.monsterBulletGroup.empty()
+                # TODO integrate into monster explode
+                self.particleSystem.emitters["bossDieEmitter"].set_position(
+                    monster.rect.center)
+                self.particleSystem.emitters["bossDieEmitter"].set_density(500)
+                self.particleSystem.emitters["bossDieEmitter"]._padlib_update(
+                    self.particleSystem, 0.2)
+                self.particleSystem.emitters["bossDieEmitter"].set_density(0)
+
 
         self.playerBulletGroup.update()
         self.monsterBulletGroup.update(self.play_rect)
         self.playerHitbox.update(self.play_rect, self.monsterBulletGroup)
         self.playerRepr.update(self.play_rect, self.playerHitbox.deltaMoveX,
-                               self.playerHitbox.deltaMoveY)
+                               self.playerHitbox.deltaMoveY,
+                               self.playerHitbox.transform)
         hitcount = [0]
-        self.monsterGroup.update(self.playerBulletGroup, hitcount)
+        self.monsterGroup.update(self.playerBulletGroup, hitcount,
+                                 self.monsterBulletGroup,
+                                 self.playerHitbox.rect.center)
         if hitcount[0] > 0:
             self.score += hitcount[0]
         self.sidebar.update(1, self.score, 3)
         self.inGameDraw()
+        # frame counter used for fire rate
+        self.frameCount += 1
+        self.frameCount %= 100
+        self.particleSystem.update(1 / self.clockTick)
+
         if self.playerHitbox.dead:
             self.__init__()
 
@@ -163,6 +213,7 @@ class Main:
             self.playerBulletGroup.draw(self.screen)
             self.monsterBulletGroup.draw(self.screen)
             self.monsterGroup.draw(self.screen)
+            self.particleSystem.draw(self.screen)
             # stamina bar
             if self.staminaBarCur >0:
                 pygame.draw.rect(self.screen, (150, 15, 0),
@@ -174,8 +225,6 @@ class Main:
 
 
     def playerSpawn(self, pos):
-        # cX, cY = pos
-
         # Hitbox
         radius = self.playerData["radius"]
         playerHitBoxImgOrigin = pygame.Surface((radius * 2, radius * 2),
@@ -183,24 +232,19 @@ class Main:
         self.playerData["playerHitBoxImgOrigin"] = playerHitBoxImgOrigin
         playerHitBoxImg = pygame.Surface((radius * 2, radius * 2),
                                          pygame.SRCALPHA)
-        # pygame.gfxdraw.filled_circle(playerHitBoxImg, radius, radius, radius, (255, 2, 2))
-        # pygame.gfxdraw.filled_circle(playerHitBoxImg, radius, radius, radius-2, (255, 255, 255))
-        pygame.draw.ellipse(playerHitBoxImg, (255, 0, 0),
-                            [0, 0, radius * 2, radius * 2], 0)
         pygame.draw.ellipse(playerHitBoxImg, (255, 255, 255),
-                            [2, 2, radius * 2 - 4, radius * 2 - 4], 0)
-        pygame.gfxdraw.filled_circle(playerHitBoxImg, pos[0], pos[1], 3,
-                                     (255, 2, 2))
+                            [0, 0, radius * 2, radius * 2], 0)
+        # pygame.gfxdraw.filled_circle(playerHitBoxImg, pos[0], pos[1], 3,
+        #                              (255, 2, 2))
         self.playerData["playerHitBoxImgTrans"] = playerHitBoxImg
         self.playerHitbox = sprites.PlayerHitBox(pos, self.playerData[
             "playerHitBoxImgOrigin"],
                                                  self.playerData)
 
         # player repr
-        playerReprImg = pygame.Surface((20, 20), pygame.SRCALPHA)
-        pygame.draw.ellipse(playerReprImg, (55, 55, 55), [0, 0, 20, 20], 0)
-        # playerReprImg.fill((50, 55, 55))
-        self.playerRepr = sprites.PlayerRepr(pos, playerReprImg)
+        playerReprImg = pygame.Surface((26, 26), pygame.SRCALPHA)
+        self.playerRepr = sprites.PlayerRepr((pos[0], pos[1] - 4),
+                                             playerReprImg)
 
         self.hitboxGroup = pygame.sprite.Group(self.playerHitbox)
         self.playerReprGroup = pygame.sprite.Group(self.playerRepr)
@@ -215,6 +259,7 @@ class Main:
                                         monsterReprImg, stage1.monsterData)
         self.monsterGroup.add(stage1Monster)
         self.staminaBarCur = self.staminaBarMax = stage1.monsterData["stamina"]
+        self.playerHitbox.bulletData.update(stage1.playerBulletData)
 
 
 
