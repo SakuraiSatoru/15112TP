@@ -187,11 +187,11 @@ class PlayerBullet(Sprite):
 
 
 class Monster(Sprite):
-    def __init__(self, centerPoint, image, data):
+    def __init__(self, centerPoint, image, data, curSpell=-1, immutable=True):
         Sprite.__init__(self, centerPoint, image)
         self.data = data
         self.bulletData = data["bulletData"]
-        self.stamina = data["stamina"]
+        self.originStamina = self.stamina = data["stamina"]
         self.movePattern = data["moveFunc"]
         self.shooting = False
         self.bulletCount = 0
@@ -199,23 +199,40 @@ class Monster(Sprite):
             "fireRate"]
         self.target = bulletml.Bullet()
         self.target.x, self.target.y = self.rect.centerx, self.rect.centery + 200
+        self.immutable = True
+        self.immutableDur = 60
+        self.immutableCount = 0
+        self.spellNum = data["spellNum"]
+        self.currentSpellIndex = curSpell
         self.bulletMLInit()
+        self.dead = False
 
     def update(self, bullets, hitcount, monsterBulletGroup, hitBoxPos):
         if self.stamina < 1:
             self.shooting = False
-            self.kill()
+            self.immutable = True
+            self.immutableCount = 0
         else:
-            # shoot cool down
-            if self.shootCoolDownCur < 1:
-                self.shooting = True
-                self.shootCoolDownCur = self.shootCoolDown
-            else:
-                self.shootCoolDownCur -= 1
+            if self.immutable and self.immutableCount < self.immutableDur:
+                self.immutableCount += 1
                 self.shooting = False
-            # bullet hit monster
+            elif self.immutable:
+                self.immutableCount = 0
+                if self.currentSpellIndex < 0:
+                    self.currentSpellIndex = 0
+                self.immutable = False
+            else:
+                self.shooting = True
+            # shoot cool down
+            # if self.shootCoolDownCur < 1:
+            #     self.shooting = True
+            #     self.shootCoolDownCur = self.shootCoolDown
+            # else:
+            #     self.shootCoolDownCur -= 1
+            #     self.shooting = False
+            # # bullet hit monster
             for b in pygame.sprite.spritecollide(self, bullets, False):
-                self.stamina = max(0, self.stamina - 0.5)
+                self.damage(2)
                 b.kill()
                 hitcount[0] += 1
 
@@ -231,7 +248,6 @@ class Monster(Sprite):
                             n.repr.rect.center = (n.x, n.y)
                     if not monsterBulletGroup.has(n.repr):  # can be deleted?
                         monsterBulletGroup.add(n.repr)
-
                 self.bulletMLActive.update(new)
                 if (obj.finished or not (-50 < obj.x < 600) or not (
                         -50 < obj.y < 600)):
@@ -241,8 +257,6 @@ class Monster(Sprite):
                     except:
                         print("remove failure!")
                 else:
-                    # if obj.repr is None:
-                    #     obj.repr = self.getBulletRepr()
                     if not obj.vanished:
                         obj.repr.rect.center = (obj.x, obj.y)
 
@@ -251,7 +265,7 @@ class Monster(Sprite):
         cx += width / 2
         cy += height / 2
         ctrpt = cx, cy
-        script = self.bulletData["scripts"][0]
+        script = self.bulletData["scripts"][self.currentSpellIndex]
         self.bulletMLDoc = bulletml.BulletML.FromDocument(open(script, "rU"))
         self.bulletMLActive = set()
 
@@ -292,40 +306,18 @@ class Monster(Sprite):
             return None
         elif not self.bulletMLActive:
             self.bulletMLShoot()
-            # bullets = []
-            # for obj in self.bulletMLActive:
-            #     if obj.repr is None:
-            #         obj.repr = self.getBulletRepr()
-            #         obj.repr.rect.center = (obj.x, obj.y)
-            #     bullets.append(obj)
 
-            # x, y, width, height = self.rect
-            # x += width / 2
-            # y += height / 2
-            # ctrpt = x, y
-            # monsterBulletImg = pygame.Surface(
-            #     (self.bulletData["radius"] * 2, self.bulletData["radius"] * 2),
-            #     pygame.SRCALPHA)
-            # pygame.draw.ellipse(monsterBulletImg, (255, 255, 255),
-            #                     [0, 0, self.bulletData["radius"] * 2,
-            #                      self.bulletData["radius"] * 2], 1)
-            # # bullet text
-            # font = pygame.font.Font("./fonts/monotxt.ttf",
-            #                         self.bulletData["fontSize"])
-            # text = font.render(random.choice(string.ascii_uppercase), True,
-            #                    (255, 255, 255))
-            # self.bulletData["text"] = text
-            # # TODO fix this
-            # self.angle = (self.angle + self.angleIncrement) % 360
-            # self.bulletData["angle"] = self.angle
-            # bullets = []
-            # division = 4
-            # for i in range(division):
-            #     self.bulletData["angle"] += 360 // division
-            #     bullets.append(
-            #         MonsterBullet(ctrpt, monsterBulletImg, self.bulletData))
-            # self.bulletData["angle"] = self.angle
-            # return tuple(bullets)
+    def damage(self, bulletDamage):
+        if not self.immutable:
+            self.stamina = max(self.stamina - bulletDamage, 0)
+        if self.stamina == 0:
+            if self.currentSpellIndex < self.spellNum - 1:
+                self.immutable = True
+                self.currentSpellIndex += 1
+            else:
+                self.dead = True
+
+
 
 
 class MonsterBullet(Sprite):
@@ -335,13 +327,10 @@ class MonsterBullet(Sprite):
         self.deltaMoveY = 0
         self.vel = data["vel"]
         self.radius = data["radius"]
-        # self.angle = data["angle"]
         self.text = data["text"]
         self.tx = (1 - 2 ** 0.5 / 2) * self.rect.width + 1
         self.ty = (1 - 2 ** 0.5 / 2) * self.rect.height
         self.image.blit(self.text, (self.tx, self.ty))
-        # self.deltaMoveX = round(self.vel * math.cos(math.radians(self.angle)))
-        # self.deltaMoveY = round(self.vel * math.sin(math.radians(self.angle)))
 
     def pattern(self):
         pass
@@ -352,8 +341,6 @@ class MonsterBullet(Sprite):
             1] or self.rect.left > scr_rect.size[0] or self.rect.right < 0:
             self.kill()
 
-    def draw(self):
-        pass
 
 
 class SideBar(Sprite):
@@ -380,5 +367,49 @@ class SideBar(Sprite):
 
 
 class StaminaBar(Sprite):
-    def __init__(self, centerPoint, image):
+    # dict data:
+    #     int spellCount
+    #     int originStamina
+    #     int width: default cell width
+    #     int margin
+    def __init__(self, centerPoint, image, data):
         Sprite.__init__(self, centerPoint, image)
+        self.img = self.image.copy()
+        self.spellCount = data["spellNum"]
+        self.stamina = self.originStamina = data["originStamina"]
+        self.currentSpell = -1
+        self.width = data["width"]
+        self.margin = data["margin"]
+        self.remainSpellImg = pygame.Surface((self.width, self.rect.height))
+        self.remainSpellImg.fill((255, 255, 255))
+        self.recovery = True
+        self.recoveryProgres = 0
+        self.immutable = True
+
+    def update(self, stamina, currentSpell):
+        # self.stamina = stamina
+        if self.currentSpell < currentSpell or self.currentSpell == -1:
+            self.recovery = True
+        self.currentSpell = currentSpell
+        self.image = self.img.copy()
+        pos = [0, 0]
+        # draw remaining rect
+        for i in range(
+                self.spellCount - self.currentSpell - 1):  # n of remaining spells
+            self.image.blit(self.remainSpellImg, pos)
+            pos[0] += self.width + self.margin
+        l1 = self.rect.width - pos[0]
+        # draw current bar
+        if not self.recovery:
+            l2 = l1 * stamina // self.originStamina
+            self.recoveryProgres = 0  # reset
+            currentBar = pygame.Surface((l2, self.rect.height))
+        else:
+            if self.recoveryProgres < l1:
+                self.recoveryProgres += 10
+            else:
+                self.recovery = False
+            currentBar = pygame.Surface(
+                (self.recoveryProgres, self.rect.height))
+        currentBar.fill((255, 255, 255))
+        self.image.blit(currentBar, pos)

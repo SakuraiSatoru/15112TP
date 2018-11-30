@@ -69,7 +69,7 @@ class Main:
         self.score = 0
         self.clockTick = 60
         # TODO Boss stamina bar
-        self.staminaBarMax = self.staminaBarCur = self.width * 4/5
+        # self.staminaBarMax = self.staminaBarCur = self.width * 4/5
         self.current_menu = self.startingMenu
         self.playing = False
         # TODO implement player shooting rate according to stage
@@ -114,7 +114,6 @@ class Main:
 
     def eventListener(self, event):
         pygame.event.pump()
-        # print(pygame.key.get_mods())
         if event.type == pygame.QUIT:
             self._running = False
         elif self.inMenu and event.type == KEYDOWN:
@@ -159,28 +158,26 @@ class Main:
             for b in playerBullets:
                 if b is not None:
                     self.playerBulletGroup.add(b)
-        for monster in self.monsterGroup:
-            monster.target.x, monster.target.y = self.playerHitbox.rect.center
-            self.staminaBarCur = monster.stamina
-            if monster.shooting:
-                monsterBullets = monster.shoot()
-                if monsterBullets is not None:
-                    for b in monsterBullets:
-                        self.monsterBulletGroup.add(b)
-            if monster.stamina < 1:
-                # TODO fix this, delete all bullets
-                # for b in self.monsterBulletGroup:
-                #     b.kill()
-                self.staminaBarCur = 0
-                self.monsterBulletGroup.empty()
-                # TODO integrate into monster explode
-                self.particleSystem.emitters["bossDieEmitter"].set_position(
-                    monster.rect.center)
-                self.particleSystem.emitters["bossDieEmitter"].set_density(500)
-                self.particleSystem.emitters["bossDieEmitter"]._padlib_update(
-                    self.particleSystem, 0.2)
-                self.particleSystem.emitters["bossDieEmitter"].set_density(0)
+        monster = self.monster
+        monster.target.x, monster.target.y = self.playerHitbox.rect.center
+        if monster.shooting:
+            monsterBullets = monster.shoot()
+            if monsterBullets is not None:
+                for b in monsterBullets:
+                    self.monsterBulletGroup.add(b)
 
+        if self.monster.dead and self.monsterGroup.has(self.monster):
+            self.activateBossEmitter()
+            self.monster.kill()
+            self.monsterGroup.empty()
+            self.monsterBulletGroup.empty()
+            self.staminaBarGroup.empty()
+        elif monster.stamina < 1:
+            self.monsterBulletGroup.empty()
+            if monster.immutable and not monster.dead:
+                monster.stamina = monster.originStamina
+            if monster.immutable and monster.immutableCount == 0:
+                self.activateBossEmitter()
 
         self.playerBulletGroup.update()
         self.monsterBulletGroup.update(self.play_rect)
@@ -194,15 +191,25 @@ class Main:
                                  self.playerHitbox.rect.center)
         if hitcount[0] > 0:
             self.score += hitcount[0]
+        self.staminaBarGroup.update(self.monster.stamina,
+                                    max(self.monster.currentSpellIndex, 0))
         self.sidebar.update(1, self.score, 3)
-        self.inGameDraw()
         # frame counter used for fire rate
         self.frameCount += 1
         self.frameCount %= 100
         self.particleSystem.update(1 / self.clockTick)
-
         if self.playerHitbox.dead:
             self.__init__()
+        self.inGameDraw()
+
+    def activateBossEmitter(self):
+        self.particleSystem.emitters["bossDieEmitter"].set_position(
+            self.monster.rect.center)
+        self.particleSystem.emitters["bossDieEmitter"].set_density(500)
+        self.particleSystem.emitters["bossDieEmitter"]._padlib_update(
+            self.particleSystem, 0.2)
+        self.particleSystem.emitters["bossDieEmitter"].set_density(0)
+
 
     def inGameDraw(self):
         if not self.inMenu:
@@ -214,12 +221,13 @@ class Main:
             self.monsterBulletGroup.draw(self.screen)
             self.monsterGroup.draw(self.screen)
             self.particleSystem.draw(self.screen)
+            self.staminaBarGroup.draw(self.screen)
             # stamina bar
-            if self.staminaBarCur >0:
-                pygame.draw.rect(self.screen, (150, 15, 0),
-                                 [self.playSizeX // 20, self.playSizeX // 20,
-                                  self.playSizeX * 0.9 * self.staminaBarCur / self.staminaBarMax,
-                                  2])
+            # if self.staminaBarCur >0:
+            #     pygame.draw.rect(self.screen, (150, 15, 0),
+            #                      [self.playSizeX // 20, self.playSizeX // 20,
+            #                       self.playSizeX * 0.9 * self.staminaBarCur / self.staminaBarMax,
+            #                       2])
             self.sidebar.draw(self.screen)
 
 
@@ -255,10 +263,18 @@ class Main:
         stage1 = levels.Stage1()
         monsterReprImg = stage1.monsterReprImg
         # pygame.draw.rect(monsterReprImg,(255,255,255),(0,0,40,40),1)
-        stage1Monster = sprites.Monster((self.playSizeX / 2, 100),
-                                        monsterReprImg, stage1.monsterData)
-        self.monsterGroup.add(stage1Monster)
-        self.staminaBarCur = self.staminaBarMax = stage1.monsterData["stamina"]
+        self.monster = sprites.Monster((self.playSizeX / 2, 100),
+                                       monsterReprImg, stage1.monsterData)
+        self.monsterGroup.add(self.monster)
+        # self.staminaBarCur = self.staminaBarMax = stage1.monsterData["stamina"]
+        staminaBarData = {"spellNum": stage1.monsterData["spellNum"],
+                          "width": 6, "margin": 4,
+                          "originStamina": stage1.monsterData["stamina"]}
+        self.staminaBar = sprites.StaminaBar((self.playSizeX / 2, 20),
+                                             pygame.Surface(
+                                                 (self.playSizeX - 30, 1)),
+                                             staminaBarData)
+        self.staminaBarGroup = pygame.sprite.Group(self.staminaBar)
         self.playerHitbox.bulletData.update(stage1.playerBulletData)
 
 
