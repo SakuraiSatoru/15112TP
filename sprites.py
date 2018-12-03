@@ -6,9 +6,9 @@ import math
 import string
 import copy
 import bulletml
+import helper
 
 class Sprite(pygame.sprite.Sprite):
-
     def __init__(self, centerPoint, image):
         pygame.sprite.Sprite.__init__(self)
         self.image = image
@@ -55,6 +55,7 @@ class PlayerHitBox(Sprite):
         Sprite.__init__(self, centerPoint, data["playerHitBoxImgOrigin"])
         self.lives = data["lives"]
         self.shooting = False
+        self.shootable = True
         self.movable = False
         self.deltaMoveX = self.deltaMoveY = 0
         self.vel = data["velFast"]
@@ -123,7 +124,7 @@ class PlayerHitBox(Sprite):
         if self.lives < 1:
             self.shooting = False
             return None
-        else:
+        elif self.shootable:
             x, y, width, height = self.rect
             x += (width / 2)
             ctrpt = x, y
@@ -147,6 +148,7 @@ class PlayerHitBox(Sprite):
                                          bulletData)
                 bulletList.append(newBullet)
             return bulletList
+        return None
 
     def getBulletPos(self):
         if not self.transform:
@@ -161,7 +163,7 @@ class PlayerHitBox(Sprite):
         for i in reversed(range(len(lst) // 2)):
             if lst[i] == 0:
                 returnLst.insert(0, (
-                self.rect.centerx - offset, self.rect.centery))
+                    self.rect.centerx - offset, self.rect.centery))
                 returnLst.append(
                     (self.rect.centerx + offset, self.rect.centery))
                 offset += 4
@@ -186,14 +188,75 @@ class PlayerBullet(Sprite):
             self.kill()
 
 
-class Monster(Sprite):
-    def __init__(self, centerPoint, image, data, curSpell=-1, immutable=True):
+class StageName(Sprite):
+    def __init__(self, centerPoint, image, data):
         Sprite.__init__(self, centerPoint, image)
+        # self.image.fill((255,255,255))
+        self.originImg = self.image.copy()
+        self.target = bulletml.Bullet()
+        self.dead = False
         self.data = data
+        self.name = data["stageName"]
+        self.descript = data["stageDescript"]
+        # self.immutable = True
+        self.path = r".\scripts\0_0.xml"
+        self.newPath = None
+        self.pathInit(self.rect.centerx, self.rect.centery)
+        self.duration = 2500
+
+    def pathInit(self, x=300, y=5):
+        self.pathDoc = bulletml.BulletML.FromDocument(open(self.path, "rU"))
+        self.pathActive = set()
+        self.pathSource = bulletml.Bullet.FromDocument(self.pathDoc,
+                                                       x=x,
+                                                       y=y,
+                                                       target=self.target,
+                                                       rank=1)
+        # self.pathSource.vanished = True
+        self.pathActive.add(self.pathSource)
+
+    def update(self):
+        clr = max(min(255, self.duration), 0)
+        self.image = self.originImg.copy()
+        # font = pygame.font.Font("./fonts/monotxt.ttf", 20)
+        font = pygame.font.Font(None, 24)
+        text = font.render("Stage: " + self.name, True, (clr, clr, clr))
+        self.image.blit(text, (
+        self.image.get_rect().width / 2 - text.get_rect().width / 2, 0))
+        font = pygame.font.Font(None, 18)
+        text = font.render(self.descript, True, (clr, clr, clr))
+        self.image.blit(text, (
+        self.image.get_rect().width / 2 - text.get_rect().width / 2, 24))
+
+        self.duration -= 10
+        if self.duration < 0:
+            self.dead = True
+            self.kill()
+        else:
+            # make movement
+            if len(self.pathActive) > 0:
+                for path in list(self.pathActive):
+                    newPath = path.step()
+                    if len(newPath) > 0 and self.newPath is None:
+                        self.newPath = newPath[0]
+                        self.pathActive.clear()
+            if self.newPath is not None:
+                self.rect.center = self.newPath.x, self.newPath.y
+                self.newPath.step()
+
+
+
+
+
+class Monster(Sprite):
+    def __init__(self, centerPoint, image, data):
+        Sprite.__init__(self, centerPoint, image)
+        self.dead = False
+        self.data = data
+        self.shooting = False
         self.bulletData = data["bulletData"]
         self.originStamina = self.stamina = data["stamina"]
-        self.movePattern = data["moveFunc"]
-        self.shooting = False
+        self.path = data["path"]
         self.bulletCount = 0
         self.shootCoolDown = self.shootCoolDownCur = self.bulletData[
             "fireRate"]
@@ -203,11 +266,24 @@ class Monster(Sprite):
         self.immutableDur = 60
         self.immutableCount = 0
         self.spellNum = data["spellNum"]
-        self.currentSpellIndex = curSpell
+        self.currentSpellIndex = -1
         self.bulletMLInit()
-        self.dead = False
+        self.newPath = None
+        self.pathInit(self.rect.centerx, self.rect.centery)
+        self.generator = self.getBulletChar()
 
     def update(self, bullets, hitcount, monsterBulletGroup, hitBoxPos):
+        # make movement
+        if len(self.pathActive) > 0:
+            for path in list(self.pathActive):
+                newPath = path.step()
+                if len(newPath) > 0 and self.newPath is None:
+                    self.newPath = newPath[0]
+                    self.pathActive.clear()
+        if self.newPath is not None:
+            self.rect.center = self.newPath.x, self.newPath.y
+            self.newPath.step()
+
         if self.stamina < 1:
             self.shooting = False
             self.immutable = True
@@ -223,16 +299,9 @@ class Monster(Sprite):
                 self.immutable = False
             else:
                 self.shooting = True
-            # shoot cool down
-            # if self.shootCoolDownCur < 1:
-            #     self.shooting = True
-            #     self.shootCoolDownCur = self.shootCoolDown
-            # else:
-            #     self.shootCoolDownCur -= 1
-            #     self.shooting = False
             # # bullet hit monster
             for b in pygame.sprite.spritecollide(self, bullets, False):
-                self.damage(2)
+                self.damage(5)
                 b.kill()
                 hitcount[0] += 1
 
@@ -243,6 +312,8 @@ class Monster(Sprite):
                 # self.bulletMLActive.update(new)
                 if new:
                     for n in new:
+                        # Sync new bullet to monster center
+                        n.x, n.y = self.rect.center
                         if not n.vanished:
                             n.repr = self.getBulletRepr()
                             n.repr.rect.center = (n.x, n.y)
@@ -259,6 +330,17 @@ class Monster(Sprite):
                 else:
                     if not obj.vanished:
                         obj.repr.rect.center = (obj.x, obj.y)
+
+    def pathInit(self, x=300, y=5):
+        self.pathDoc = bulletml.BulletML.FromDocument(open(self.path, "rU"))
+        self.pathActive = set()
+        self.pathSource = bulletml.Bullet.FromDocument(self.pathDoc,
+                                                       x=x,
+                                                       y=y,
+                                                       target=self.target,
+                                                       rank=1)
+        # self.pathSource.vanished = True
+        self.pathActive.add(self.pathSource)
 
     def bulletMLInit(self):
         cx, cy, width, height = self.rect
@@ -295,10 +377,22 @@ class Monster(Sprite):
         # font = pygame.font.Font("./fonts/monotxt.ttf",
         #                         self.bulletData["fontSize"])
         font = pygame.font.Font(None, self.bulletData["fontSize"])
-        text = font.render(random.choice(string.ascii_uppercase), True,
-                           (255, 255, 255))
+        text = font.render(next(self.generator), True, (255, 255, 255))
         self.bulletData["text"] = text
         return MonsterBullet(ctrpt, monsterBulletImg, self.bulletData)
+
+    def getBulletChar(self):
+        i = 0
+        prev = self.currentSpellIndex
+        while True:
+            if prev != self.currentSpellIndex:
+                i = 0
+                prev = self.currentSpellIndex
+            c = self.bulletData["pyScripts"][self.currentSpellIndex][i]
+            if c != " ":
+                yield c
+            i = (i + 1) % len(
+                self.bulletData["pyScripts"][self.currentSpellIndex])
 
     def shoot(self):
         if self.stamina < 1:
@@ -310,14 +404,12 @@ class Monster(Sprite):
     def damage(self, bulletDamage):
         if not self.immutable:
             self.stamina = max(self.stamina - bulletDamage, 0)
-        if self.stamina == 0:
+        if self.stamina == 0 and not self.immutable:
+            self.immutable = True
             if self.currentSpellIndex < self.spellNum - 1:
-                self.immutable = True
                 self.currentSpellIndex += 1
             else:
                 self.dead = True
-
-
 
 
 class MonsterBullet(Sprite):
@@ -342,14 +434,18 @@ class MonsterBullet(Sprite):
             self.kill()
 
 
-
 class SideBar(Sprite):
     def __init__(self, centerPoint, image):
         Sprite.__init__(self, centerPoint, image)
-        pygame.draw.rect(image, (255, 255, 255),
-                         (5, 5, self.rect.width - 6, self.rect.height - 6), 1)
-        self.image = image
-        self.originImg = image.copy()
+        # pygame.draw.rect(image, (255, 255, 255),
+        #                  (5, 5, self.rect.width - 6, self.rect.height - 6), 1)
+        # helper.filledRoundedRect(self.image, self.rect, (255,255,255), 0.2)
+        helper.filledRoundedRect(self.image, (
+        8, 8, self.rect.width - 16, self.rect.height - 16), (255, 255, 255),
+                                 0.2)
+        helper.filledRoundedRect(self.image, (
+        9, 9, self.rect.width - 18, self.rect.height - 18), (0, 0, 0), 0.2)
+        self.originImg = self.image.copy()
         self.stage = 1
         self.score = 0
         self.lives = 0
