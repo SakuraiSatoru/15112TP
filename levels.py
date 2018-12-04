@@ -54,7 +54,6 @@ class Stage(object):
             dict = pyReader.read(r".\data\default.dat")
         except:
             dataloaded = False
-        print(len(dict))
         if len(dict) == 10 and dataloaded:
             print("successfully loaded python scripts")
         else:
@@ -73,9 +72,10 @@ class Stage(object):
 class Stage1(Stage):
     def __init__(self):
         Stage.__init__(self, 1)
-        monsterBulletScripts = ["scripts/1_1.xml"] * 3
+        monsterBulletScripts = ["scripts/1_1.xml", "scripts/1_2.xml",
+                                "scripts/1_3.xml", "scripts/1_4.xml",
+                                "scripts/1_5.xml", ]
         pyScripts = self.stageScripts["1"]["scripts"]
-        print(self.stageScripts)
         monsterBulletData = {"radius": 10, "color": (255, 255, 255), "vel": 5,
                              "fireRate": 50, "fontSize": 16,
                              "scripts": monsterBulletScripts,
@@ -113,7 +113,6 @@ class Stage3(Stage):
         Stage.__init__(self, 3)
         monsterBulletScripts = ["scripts/1_1.xml"] * 3
         pyScripts = self.stageScripts["3"]["scripts"]
-        print(self.stageScripts)
         monsterBulletData = {"radius": 10, "color": (255, 255, 255), "vel": 5,
                              "fireRate": 50, "fontSize": 16,
                              "scripts": monsterBulletScripts,
@@ -132,7 +131,6 @@ class Stage4(Stage):
         Stage.__init__(self, 4)
         monsterBulletScripts = ["scripts/1_1.xml"] * 3
         pyScripts = self.stageScripts["4"]["scripts"]
-        print(self.stageScripts)
         monsterBulletData = {"radius": 10, "color": (255, 255, 255), "vel": 5,
                              "fireRate": 50, "fontSize": 16,
                              "scripts": monsterBulletScripts,
@@ -151,7 +149,6 @@ class Stage5(Stage):
         Stage.__init__(self, 5)
         monsterBulletScripts = ["scripts/1_1.xml"] * 3
         pyScripts = self.stageScripts["5"]["scripts"]
-        print(self.stageScripts)
         monsterBulletData = {"radius": 10, "color": (255, 255, 255), "vel": 5,
                              "fireRate": 50, "fontSize": 16,
                              "scripts": monsterBulletScripts,
@@ -170,7 +167,6 @@ class Stage6(Stage):
         Stage.__init__(self, 6)
         monsterBulletScripts = ["scripts/1_1.xml"] * 3
         pyScripts = self.stageScripts["6"]["scripts"]
-        print(self.stageScripts)
         monsterBulletData = {"radius": 10, "color": (255, 255, 255), "vel": 5,
                              "fireRate": 50, "fontSize": 16,
                              "scripts": monsterBulletScripts,
@@ -190,7 +186,6 @@ class Stage7(Stage):
         Stage.__init__(self, 8)
         monsterBulletScripts = ["scripts/1_1.xml"] * 3
         pyScripts = self.stageScripts["8"]["scripts"]
-        print(self.stageScripts)
         monsterBulletData = {"radius": 10, "color": (255, 255, 255), "vel": 5,
                              "fireRate": 50, "fontSize": 16,
                              "scripts": monsterBulletScripts,
@@ -209,7 +204,6 @@ class Stage8(Stage):
         Stage.__init__(self, 9)
         monsterBulletScripts = ["scripts/1_1.xml"] * 3
         pyScripts = self.stageScripts["9"]["scripts"]
-        print(self.stageScripts)
         monsterBulletData = {"radius": 10, "color": (255, 255, 255), "vel": 5,
                              "fireRate": 50, "fontSize": 16,
                              "scripts": monsterBulletScripts,
@@ -228,7 +222,6 @@ class Stage9(Stage):
         Stage.__init__(self, 10)
         monsterBulletScripts = ["scripts/1_1.xml"] * 3
         pyScripts = self.stageScripts["10"]["scripts"]
-        print(self.stageScripts)
         monsterBulletData = {"radius": 10, "color": (255, 255, 255), "vel": 5,
                              "fireRate": 50, "fontSize": 16,
                              "scripts": monsterBulletScripts,
@@ -245,9 +238,10 @@ class Stage9(Stage):
 class Stage10(Stage):
     def __init__(self):
         Stage.__init__(self, 11)
-        monsterBulletScripts = ["scripts/1_1.xml"] * 3
+        monsterBulletScripts = ["scripts/1_1.xml", "scripts/1_2.xml",
+                                "scripts/1_2.xml", "scripts/1_2.xml",
+                                "scripts/1_2.xml", ]
         pyScripts = self.stageScripts["11"]["scripts"]
-        print(self.stageScripts)
         monsterBulletData = {"radius": 10, "color": (255, 255, 255), "vel": 5,
                              "fireRate": 50, "fontSize": 16,
                              "scripts": monsterBulletScripts,

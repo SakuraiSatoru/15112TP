@@ -198,12 +198,10 @@ class Main:
                 if monster.immutable and monster.immutableCount == 0:
                     self.activateBossEmitter()
             if monster.newSpell[0]:
-                print("newspell!")
                 self.popUpGroup.empty()
                 self.popUpGroup.add(
-                    sprites.popUp((-100, 40), pygame.Surface((200, 16)),
+                    sprites.popUp((-100, 40), pygame.Surface((300, 16)),
                                   monster.newSpell[1]))
-                print(monster.newSpell)
                 self.monster.newSpell = [False, ""]
 
         self.playerBulletGroup.update()
@@ -231,7 +229,6 @@ class Main:
         self.frameCount %= 100
         self.particleSystem.update(1 / self.clockTick)
         if hasattr(self, "monster") and self.playerHitbox.spawnDur == 2:
-            print("start to shoot")
             self.monster.shooting = True
         elif hasattr(self, "monster") and self.playerHitbox.spawnDur > 2:
             self.monsterBulletGroup.empty()
@@ -240,7 +237,6 @@ class Main:
                 self.__init__()
             elif self.playerHitbox.spawnWaiting == self.playerHitbox.spawnWait:
                 self.monster.shooting = False
-                print(self.monster.shooting)
                 self.activePlayerEmitter()
             elif self.playerHitbox.spawnWaiting <= 10:
                 self.monsterBulletGroup.empty()
@@ -320,7 +316,7 @@ class Main:
                                       stage.monsterReprImg, stage.monsterData)
             self.monsterList.append(monster)
             staminaBarData = {"spellNum": stage.monsterData["spellNum"],
-                              "width": 6, "margin": 4,
+                              "width": 4, "margin": 4,
                               "originStamina": stage.monsterData["stamina"]}
             staminaBar = sprites.StaminaBar((self.playSizeX / 2, 20),
                                             pygame.Surface(

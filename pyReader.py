@@ -54,7 +54,6 @@ def extractScripts(fileList):
                                 j += 1
             dict["scripts"] = dict["scripts"][::-1]
             returnDict[int(dict["no"])] = dict
-    print(returnDict)
     return returnDict
 
 

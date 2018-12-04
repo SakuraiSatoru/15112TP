@@ -341,12 +341,10 @@ class Monster(Sprite):
         self.originStamina = self.stamina = data["stamina"]
         self.path = data["path"]
         self.bulletCount = 0
-        self.shootCoolDown = self.shootCoolDownCur = self.bulletData[
-            "fireRate"]
         self.target = bulletml.Bullet()
         self.target.x, self.target.y = self.rect.centerx, self.rect.centery + 200
         self.immutable = True
-        self.immutableDur = 60
+        self.immutableDur = 100
         self.immutableCount = 0
         self.spellNum = data["spellNum"]
         self.currentSpellIndex = -1
@@ -390,31 +388,34 @@ class Monster(Sprite):
                 b.kill()
                 hitcount[0] += 1
 
+            # handle bullets
             self.target.x, self.target.y = hitBoxPos
+            if not hasattr(self, "bulletMLActive"):
+                return
+
+
             for obj in list(self.bulletMLActive):
                 new = obj.step()
-                # TODO where to put this:
-                # self.bulletMLActive.update(new)
-                if new:
-                    for n in new:
-                        # Sync new bullet to monster center
-                        n.x, n.y = self.rect.center
-                        if not n.vanished:
-                            n.repr = self.getBulletRepr()
-                            n.repr.rect.center = (n.x, n.y)
-                    if not monsterBulletGroup.has(n.repr):  # can be deleted?
-                        monsterBulletGroup.add(n.repr)
                 self.bulletMLActive.update(new)
                 if (obj.finished or not (-50 < obj.x < 600) or not (
                         -50 < obj.y < 600)):
                     self.bulletMLActive.remove(obj)
-                    try:
+                    if hasattr(obj, "repr") and monsterBulletGroup.has(
+                            obj.repr):
                         monsterBulletGroup.remove(obj.repr)
-                    except:
-                        print("remove failure!")
-                else:
-                    if not obj.vanished:
+            for obj in self.bulletMLActive:
+                if not obj.vanished:
+                    if hasattr(obj, "repr"):
                         obj.repr.rect.center = (obj.x, obj.y)
+                    else:
+                        obj.repr = self.getBulletRepr()
+                        obj.repr.rect.center = (obj.x, obj.y)
+                        monsterBulletGroup.add(obj.repr)
+                else:
+                    if hasattr(obj, "repr") and monsterBulletGroup.has(
+                            obj.repr):
+                        monsterBulletGroup.remove(obj.repr)
+
 
     def pathInit(self, x=300, y=5):
         self.pathDoc = bulletml.BulletML.FromDocument(open(self.path, "rU"))
@@ -424,27 +425,25 @@ class Monster(Sprite):
                                                        y=y,
                                                        target=self.target,
                                                        rank=1)
-        # self.pathSource.vanished = True
         self.pathActive.add(self.pathSource)
 
     def bulletMLInit(self):
-        cx, cy, width, height = self.rect
-        cx += width / 2
-        cy += height / 2
-        ctrpt = cx, cy
-        script = self.bulletData["scripts"][self.currentSpellIndex]
-        self.bulletMLDoc = bulletml.BulletML.FromDocument(open(script, "rU"))
-        self.bulletMLActive = set()
+        self.script = self.bulletData["scripts"][
+            max(self.currentSpellIndex, 0)]
 
     def bulletMLShoot(self):
+        print(self.script)
+        self.bulletMLDoc = bulletml.BulletML.FromDocument(
+            open(self.script, "rU"))
         self.bulletMLSource = bulletml.Bullet.FromDocument(self.bulletMLDoc,
                                                            x=self.rect.centerx,
                                                            y=self.rect.centery,
                                                            target=self.target,
                                                            rank=0.2)
         # self.bulletMLSource.repr = self.getBulletRepr()
+        # self.bulletMLActive.add([self.bulletMLSource])
+        self.bulletMLActive = set([self.bulletMLSource])
         self.bulletMLSource.vanished = True
-        self.bulletMLActive.add(self.bulletMLSource)
         # return self.target, self.bulletMLActive
 
     def getBulletRepr(self):
@@ -487,8 +486,10 @@ class Monster(Sprite):
     def shoot(self):
         if not self.shooting or self.stamina < 1:
             self.shooting = False
-            return None
-        elif not self.bulletMLActive:
+            self.bulletMLActive.clear()
+            return
+        elif (not hasattr(self, "bulletMLActive")) or (
+        not self.bulletMLActive):
             self.bulletMLShoot()
 
     def damage(self, bulletDamage):
@@ -498,6 +499,7 @@ class Monster(Sprite):
             self.immutable = True
             if self.currentSpellIndex < self.spellNum - 1:
                 self.currentSpellIndex += 1
+                self.bulletMLInit()
             else:
                 self.dead = True
 
