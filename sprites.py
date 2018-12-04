@@ -39,20 +39,20 @@ class PlayerRepr(Sprite):
         self.playerReprImgTrans.blit(self.playerReprImgLeft, (1, 0))
         self.playerReprImgTrans.blit(self.playerReprImgRight, (12, 0))
 
-    def update(self, scr_size, xMove=0, yMove=0, trans=False):
+    def update(self, scr_size, center, trans=False):
+        self.rect.center = center[0], center[1] - 4
         if trans and self.image == self.playerReprImg:
             self.image = self.playerReprImgTrans
         elif (not trans) and self.image == self.playerReprImgTrans:
             self.image = self.playerReprImg
-        self.rect.move_ip(xMove, yMove)
-        # TODO fix this
-        self.rect.clamp_ip(
-            pygame.Rect(-8, -11, scr_size.width + 16, scr_size.height + 16))
 
 
 class PlayerHitBox(Sprite):
     def __init__(self, centerPoint, image, data):
         Sprite.__init__(self, centerPoint, data["playerHitBoxImgOrigin"])
+        self.originCenter = centerPoint
+        self.spawnWaiting = self.spawnWait = 50  # count down of hit towards respawn
+        self.spawnDur = 100  # count down of spawn movement
         self.lives = data["lives"]
         self.shooting = False
         self.shootable = True
@@ -69,8 +69,52 @@ class PlayerHitBox(Sprite):
         self.transformImg = data["playerHitBoxImgTrans"]
         self.transform = False
         self.keyHold = []
+        self.target = self.rect.center
+        self.newPath = None
+        self.pathInit(self.rect.centerx, self.rect.centery)
+
+    def pathInit(self, x=300, y=5):
+        pathDoc = bulletml.BulletML.FromDocument(
+            open(r".\scripts\0_1.xml", "rU"))
+        self.pathActive = set()
+        self.pathSource = bulletml.Bullet.FromDocument(pathDoc,
+                                                       x=x, y=y,
+                                                       target=self.target,
+                                                       rank=1)
+        # self.pathSource.vanished = True
+        self.pathActive.add(self.pathSource)
+
 
     def update(self, scr_size, bullets):
+        if self.spawnDur > 0:
+            self.shootable = False
+            self.spawnDur -= 1
+            # make movement
+            if len(self.pathActive) > 0:
+                for path in list(self.pathActive):
+                    newPath = path.step()
+                    if len(newPath) > 0 and self.newPath is None:
+                        self.newPath = newPath[0]
+                        self.pathActive.clear()
+            if self.newPath is not None:
+                self.rect.center = self.newPath.x, self.newPath.y
+                self.newPath.step()
+        else:
+            self.movable = True
+            self.shootable = True
+
+        if self.dead:
+            self.shootable = False
+            self.movable = False
+            if self.lives > 0:
+                self.spawnWaiting -= 1
+            if self.spawnWaiting < 1:
+                self.respawn()
+            return
+
+
+
+
 
         self.deltaMoveX = 0
         self.deltaMoveY = 0
@@ -172,6 +216,11 @@ class PlayerHitBox(Sprite):
                 returnLst.append(self.rect.center)
         return returnLst
 
+    def respawn(self):
+        self.data["lives"] -= 1
+        self.__init__(self.originCenter, self.data["playerHitBoxImgOrigin"],
+                      self.data)
+
 
 class PlayerBullet(Sprite):
     def __init__(self, centerPoint, image, data):
@@ -204,7 +253,7 @@ class StageName(Sprite):
         self.pathInit(self.rect.centerx, self.rect.centery)
         self.duration = 2500
 
-    def pathInit(self, x=300, y=5):
+    def pathInit(self, x, y):
         self.pathDoc = bulletml.BulletML.FromDocument(open(self.path, "rU"))
         self.pathActive = set()
         self.pathSource = bulletml.Bullet.FromDocument(self.pathDoc,
@@ -245,8 +294,42 @@ class StageName(Sprite):
                 self.newPath.step()
 
 
+class popUp(StageName):
+    def __init__(self, centerPoint, image, text):
+        Sprite.__init__(self, centerPoint, image)
+        self.originImg = self.image.copy()
+        self.target = bulletml.Bullet()
+        self.dead = False
+        self.text = text
+        self.path = r".\scripts\0_3.xml"
+        self.newPath = None
+        self.pathInit(self.rect.centerx, self.rect.centery)
+        self.duration = 8000
 
+    def update(self):
+        clr = max(min(255, self.duration), 0)
+        self.image = self.originImg.copy()
+        # font = pygame.font.Font("./fonts/monotxt.ttf", 20)
+        font = pygame.font.Font(None, 16)
+        text = font.render("Spell Func <" + self.text + ">", True,
+                           (clr, clr, clr))
+        self.image.blit(text, (0, 0))
 
+        self.duration -= 20
+        if self.duration < 0:
+            self.dead = True
+            self.kill()
+        else:
+            # make movement
+            if len(self.pathActive) > 0:
+                for path in list(self.pathActive):
+                    newPath = path.step()
+                    if len(newPath) > 0 and self.newPath is None:
+                        self.newPath = newPath[0]
+                        self.pathActive.clear()
+            if self.newPath is not None:
+                self.rect.center = self.newPath.x, self.newPath.y
+                self.newPath.step()
 
 class Monster(Sprite):
     def __init__(self, centerPoint, image, data):
@@ -271,6 +354,8 @@ class Monster(Sprite):
         self.newPath = None
         self.pathInit(self.rect.centerx, self.rect.centery)
         self.generator = self.getBulletChar()
+        # indicator of new popUp
+        self.newSpell = [False, ""]
 
     def update(self, bullets, hitcount, monsterBulletGroup, hitBoxPos):
         # make movement
@@ -297,8 +382,8 @@ class Monster(Sprite):
                 if self.currentSpellIndex < 0:
                     self.currentSpellIndex = 0
                 self.immutable = False
-            else:
                 self.shooting = True
+                self.newSpell = [True, self.getSpellName()]
             # # bullet hit monster
             for b in pygame.sprite.spritecollide(self, bullets, False):
                 self.damage(5)
@@ -394,8 +479,13 @@ class Monster(Sprite):
             i = (i + 1) % len(
                 self.bulletData["pyScripts"][self.currentSpellIndex])
 
+    def getSpellName(self):
+        s = self.bulletData["pyScripts"][self.currentSpellIndex].split("(")[0][
+            4:]
+        return s
+
     def shoot(self):
-        if self.stamina < 1:
+        if not self.shooting or self.stamina < 1:
             self.shooting = False
             return None
         elif not self.bulletMLActive:
@@ -460,6 +550,8 @@ class SideBar(Sprite):
         self.image.blit(text, (20, 40))
         text = font.render("Score: %s" % self.score, True, (255, 255, 255))
         self.image.blit(text, (20, 100))
+        text = font.render("Lives: %s" % self.lives, True, (255, 255, 255))
+        self.image.blit(text, (20, 160))
 
 
 class StaminaBar(Sprite):
@@ -509,3 +601,4 @@ class StaminaBar(Sprite):
                 (self.recoveryProgres, self.rect.height))
         currentBar.fill((255, 255, 255))
         self.image.blit(currentBar, pos)
+

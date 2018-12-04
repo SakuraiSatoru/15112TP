@@ -85,6 +85,7 @@ class Main:
         self.monsterBulletGroup = pygame.sprite.Group()
         self.stageNameGroup = pygame.sprite.Group()
         self.staminaBarGroup = pygame.sprite.Group()
+        self.popUpGroup = pygame.sprite.Group()
         self.sidebar = pygame.sprite.RenderPlain(
             sprites.SideBar((self.width - 75, (self.height) / 2),
                             pygame.Surface((150, self.height))))
@@ -153,7 +154,7 @@ class Main:
         self.screen.fill((0, 0, 0))
         # self.playerData = {"lives":3}
         self.initSpawnQueue()
-        self.playerSpawn((self.playSizeX // 2, self.height - 20))
+        self.playerSpawn((self.playSizeX // 2, self.height + 80))
         self.playing = True
         self.currentMode = 1
         # self.enemySpawn()
@@ -186,24 +187,33 @@ class Main:
                 self.monsterGroup.empty()
                 self.monsterBulletGroup.empty()
                 self.staminaBarGroup.empty()
+                self.popUpGroup.empty()
                 self.currentMode = 1
                 self.currentStage += 1
             elif monster.stamina < 1 and not self.monster.dead:
                 self.monsterBulletGroup.empty()
+                self.popUpGroup.empty()
                 if monster.immutable and not monster.dead:
                     monster.stamina = monster.originStamina
                 if monster.immutable and monster.immutableCount == 0:
                     self.activateBossEmitter()
+            if monster.newSpell[0]:
+                print("newspell!")
+                self.popUpGroup.empty()
+                self.popUpGroup.add(
+                    sprites.popUp((-100, 40), pygame.Surface((200, 16)),
+                                  monster.newSpell[1]))
+                print(monster.newSpell)
+                self.monster.newSpell = [False, ""]
 
         self.playerBulletGroup.update()
         self.monsterBulletGroup.update(self.play_rect)
         self.playerHitbox.update(self.play_rect, self.monsterBulletGroup)
-        self.playerRepr.update(self.play_rect, self.playerHitbox.deltaMoveX,
-                               self.playerHitbox.deltaMoveY,
+        self.playerRepr.update(self.play_rect, self.playerHitbox.rect.center,
                                self.playerHitbox.transform)
 
         self.stageNameGroup.update()
-
+        self.popUpGroup.update()
         hitcount = [0]
         self.monsterGroup.update(self.playerBulletGroup, hitcount,
                                  self.monsterBulletGroup,
@@ -215,13 +225,25 @@ class Main:
                                         max(self.monster.currentSpellIndex, 0))
         self.sidebar.update(
             self.stageList[self.currentStage].monsterData["stageName"],
-            self.score, 3)
+            self.score, self.playerHitbox.lives)
         # frame counter used for fire rate
         self.frameCount += 1
         self.frameCount %= 100
         self.particleSystem.update(1 / self.clockTick)
+        if hasattr(self, "monster") and self.playerHitbox.spawnDur == 2:
+            print("start to shoot")
+            self.monster.shooting = True
+        elif hasattr(self, "monster") and self.playerHitbox.spawnDur > 2:
+            self.monsterBulletGroup.empty()
         if self.playerHitbox.dead:
-            self.__init__()
+            if self.playerHitbox.lives == 0:
+                self.__init__()
+            elif self.playerHitbox.spawnWaiting == self.playerHitbox.spawnWait:
+                self.monster.shooting = False
+                print(self.monster.shooting)
+                self.activePlayerEmitter()
+            elif self.playerHitbox.spawnWaiting <= 10:
+                self.monsterBulletGroup.empty()
         self.inGameDraw()
 
     def activateBossEmitter(self):
@@ -232,19 +254,28 @@ class Main:
             self.particleSystem, 0.2)
         self.particleSystem.emitters["bossDieEmitter"].set_density(0)
 
+    def activePlayerEmitter(self):
+        self.particleSystem.emitters["playerDieEmitter"].set_position(
+            self.playerHitbox.rect.center)
+        self.particleSystem.emitters["playerDieEmitter"].set_density(500)
+        self.particleSystem.emitters["playerDieEmitter"]._padlib_update(
+            self.particleSystem, 0.2)
+        self.particleSystem.emitters["playerDieEmitter"].set_density(0)
 
     def inGameDraw(self):
         if not self.inMenu:
             pygame.display.flip()
             self.screen.fill((0, 0, 0))
-            self.playerReprGroup.draw(self.screen)
-            self.hitboxGroup.draw(self.screen)
+            if not self.playerHitbox.dead:
+                self.playerReprGroup.draw(self.screen)
+                self.hitboxGroup.draw(self.screen)
             self.playerBulletGroup.draw(self.screen)
             self.monsterBulletGroup.draw(self.screen)
             self.monsterGroup.draw(self.screen)
             self.particleSystem.draw(self.screen)
             self.staminaBarGroup.draw(self.screen)
             self.sidebar.draw(self.screen)
+            self.popUpGroup.draw(self.screen)
             self.stageNameGroup.draw(self.screen)
 
 
@@ -258,11 +289,10 @@ class Main:
         playerHitBoxImg = pygame.Surface((radius * 2, radius * 2),
                                          pygame.SRCALPHA)
         pygame.draw.ellipse(playerHitBoxImg, (255, 255, 255),
-                            [0, 0, radius * 2, radius * 2], 0)
+                            [0, 0, radius * 2, radius * 2])
         self.playerData["playerHitBoxImgTrans"] = playerHitBoxImg
         self.playerHitbox = sprites.PlayerHitBox(pos, self.playerData[
-            "playerHitBoxImgOrigin"],
-                                                 self.playerData)
+            "playerHitBoxImgOrigin"], self.playerData)
 
         # player repr
         playerReprImg = pygame.Surface((26, 26), pygame.SRCALPHA)
@@ -271,7 +301,7 @@ class Main:
 
         self.hitboxGroup = pygame.sprite.Group(self.playerHitbox)
         self.playerReprGroup = pygame.sprite.Group(self.playerRepr)
-        self.playerHitbox.movable = True
+        # self.playerHitbox.movable = True
 
     def initSpawnQueue(self):
         self.stageList = [levels.Stage1(), levels.Stage2(), levels.Stage3(),
@@ -298,13 +328,8 @@ class Main:
                                             staminaBarData)
             self.staminaBarList.append(staminaBar)
         print("initialized queue")
-        # self.stageNameGroup.add(stage1Name)
-        # self.monsterGroup.add(self.monster)
-        # self.staminaBarGroup = pygame.sprite.Group(self.staminaBar)
-        # self.playerHitbox.bulletData.update(stage1.playerBulletData)
 
     def enemySpawn(self):
-        print("spawning enemy")
         i = self.currentStage
         if (self.currentMode == 1):
             self.monsterGroup.empty()
@@ -339,38 +364,7 @@ class Main:
                     self.staminaBarGroup.empty()
                     self.stageNameGroup.empty()
 
-        # stage1 = levels.Stage1()
-        # stage1Name = sprites.StageName((self.playSizeX / 2, -50), pygame.Surface((300,60)), stage1.monsterData)
-        # self.stageNameGroup.add(stage1Name)
-        # monsterReprImg = stage1.monsterReprImg
-        # self.monster = sprites.Monster((self.playSizeX / 2, -50),monsterReprImg, stage1.monsterData)
-        # self.monsterGroup.add(self.monster)
-        # staminaBarData = {"spellNum": stage1.monsterData["spellNum"],
-        #                   "width": 6, "margin": 4,
-        #                   "originStamina": stage1.monsterData["stamina"]}
-        # self.staminaBar = sprites.StaminaBar((self.playSizeX / 2, 20),
-        #                                      pygame.Surface(
-        #                                          (self.playSizeX - 30, 1)),
-        #                                      staminaBarData)
-        # self.staminaBarGroup = pygame.sprite.Group(self.staminaBar)
 
-    # def enemySpawn(self):
-    #     # stage 1
-    #     stage1 = levels.Stage1()
-    #     stage1Name = sprites.StageName((self.playSizeX / 2, -50), pygame.Surface((300,60)), stage1.monsterData)
-    #     self.stageNameGroup.add(stage1Name)
-    #     monsterReprImg = stage1.monsterReprImg
-    #     self.monster = sprites.Monster((self.playSizeX / 2, -50),monsterReprImg, stage1.monsterData)
-    #     self.monsterGroup.add(self.monster)
-    #     staminaBarData = {"spellNum": stage1.monsterData["spellNum"],
-    #                       "width": 6, "margin": 4,
-    #                       "originStamina": stage1.monsterData["stamina"]}
-    #     self.staminaBar = sprites.StaminaBar((self.playSizeX / 2, 20),
-    #                                          pygame.Surface(
-    #                                              (self.playSizeX - 30, 1)),
-    #                                          staminaBarData)
-    #     self.staminaBarGroup = pygame.sprite.Group(self.staminaBar)
-    #     self.playerHitbox.bulletData.update(stage1.playerBulletData)
 
     def stageSpawn(self):
         pass
