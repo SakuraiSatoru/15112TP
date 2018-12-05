@@ -38,6 +38,7 @@ class PlayerRepr(Sprite):
 
         self.playerReprImgTrans.blit(self.playerReprImgLeft, (1, 0))
         self.playerReprImgTrans.blit(self.playerReprImgRight, (12, 0))
+        pygame.gfxdraw.filled_circle(self.playerReprImgTrans, 13, 16, 4, (255,255,255))
 
     def update(self, scr_size, center, trans=False):
         self.rect.center = center[0], center[1] - 4
@@ -49,7 +50,7 @@ class PlayerRepr(Sprite):
 
 class PlayerHitBox(Sprite):
     def __init__(self, centerPoint, image, data):
-        Sprite.__init__(self, centerPoint, data["playerHitBoxImgOrigin"])
+        Sprite.__init__(self, centerPoint, image)
         self.originCenter = centerPoint
         self.spawnWaiting = self.spawnWait = 50  # count down of hit towards respawn
         self.spawnDur = 100  # count down of spawn movement
@@ -480,7 +481,7 @@ class Monster(Sprite):
 
     def getSpellName(self):
         s = self.bulletData["pyScripts"][self.currentSpellIndex].split("(")[0][
-            4:]
+            3:]
         return s
 
     def shoot(self):
@@ -512,7 +513,7 @@ class MonsterBullet(Sprite):
         self.vel = data["vel"]
         self.radius = data["radius"]
         self.text = data["text"]
-        self.tx = (1 - 2 ** 0.5 / 2) * self.rect.width + 1
+        self.tx = (1 - 2 ** 0.5 / 2) * self.rect.width
         self.ty = (1 - 2 ** 0.5 / 2) * self.rect.height
         self.image.blit(self.text, (self.tx, self.ty))
 

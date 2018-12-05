@@ -1,3 +1,6 @@
+# CMU 15112 Term Project
+# @author Zhihao Fang
+# code reference: https://www.pygame.org/project/937/1620
 import pygame
 from pygame.locals import *
 import sys
@@ -7,14 +10,14 @@ import levels
 import bulletml
 import libs.PAdLib.particles as particles
 import helper
-# code reference: https://www.pygame.org/project/937/1620
-# TODO implement bulletml, cocos, PAdLib
+import fileIO
+import random
 
 class Main:
     def __init__(self):
         pygame.init()
         pygame.font.init()
-        pygame.display.set_caption("Term Project")
+        pygame.display.set_caption("PyDanmaku")
         self.size = self.width, self.height = 640, 480
         self.scr_rect = Rect(0, 0, self.width, self.height)
         self.screen = pygame.display.set_mode(self.scr_rect.size,
@@ -28,18 +31,87 @@ class Main:
 
     def menuInit(self):
         print("Initializing menus...")
-        titleMenuDict = {"choice": "Press z to start and shoot",
+        titleMenuDict = {"choice": "PyDanmaku     (Press z)",
                          "defaultClr": (200, 200, 200), "pos": (40, 150)}
         startGameMenuDict = {"choice": "StartGame", "func": self.initGame,
                              "defaultClr": (200, 200, 200),
                              "focusClr": (255, 255, 255), "pos": (60, 250)}
-        tutorialMenuDict = {"choice": "Tutorial", "func": self.initGame,
-                             "defaultClr": (200, 200, 200),
+        tutorialMenuDict = {"choice": "Tutorial", "func": self.menu, "param": None, "defaultClr": (200, 200, 200),
                              "focusClr": (255, 255, 255), "pos": (60, 280)}
+        dataMenuDict = {"choice": "User Data", "func": self.menu, "param": None, "defaultClr": (200, 200, 200),
+                             "focusClr": (255, 255, 255), "pos": (60, 310)}
+        scoreBoardMenuDict = {"choice": "High Score", "func": self.menu, "param": None, "defaultClr": (200, 200, 200),
+                             "focusClr": (255, 255, 255), "pos": (60, 340)}
         quitMenuDict = {"choice": "Quit", "func": sys.exit,
                         "defaultClr": (200, 200, 200),
-                        "focusClr": (255, 255, 255), "pos": (60, 310)}
-        self.startingMenu = (titleMenuDict, startGameMenuDict, tutorialMenuDict,quitMenuDict)
+                        "focusClr": (255, 255, 255), "pos": (60, 370)}
+        self.startingMenu = (titleMenuDict, startGameMenuDict, tutorialMenuDict, dataMenuDict, scoreBoardMenuDict, quitMenuDict)
+        tutorialTitleMenuDict = {"choice": "z - shoot    lshift - transform    arrow key - movement",
+                                 "defaultClr": (200, 200, 200),
+                                 "pos": (40, 150)}
+        tutorialBackMenuDict = {"choice": "Back", "func": self.menu, "param":self.startingMenu, "defaultClr": (200, 200, 200),
+                        "focusClr": (255, 255, 255), "pos": (60, 280)}
+        self.tutorialMenu = (tutorialTitleMenuDict, startGameMenuDict, tutorialBackMenuDict)
+        dataTitleMenuDict = {"choice": r"Copy folders containg all hwX.py into .\data folder",
+                                 "defaultClr": (200, 200, 200),
+                                 "pos": (40, 150)}
+        loadDataMenuDict =  {"choice": "Load Data", "func": self.loadUserData,
+                             "defaultClr": (200, 200, 200),
+                             "focusClr": (255, 255, 255), "pos": (60, 250)}
+        deleteDataMenuDict =  {"choice": "Delete User Data", "func": self.deleteData,
+                         "defaultClr": (200, 200, 200),
+                         "focusClr": (255, 255, 255), "pos": (60, 280)}
+        dataBackMenuDict = {"choice": "Back", "func": self.menu, "param":self.startingMenu, "defaultClr": (200, 200, 200),
+                                "focusClr": (255, 255, 255), "pos": (60, 310)}
+        self.dataMenu = (dataTitleMenuDict, loadDataMenuDict, deleteDataMenuDict, dataBackMenuDict)
+        tutorialMenuDict["param"] = self.tutorialMenu
+        dataMenuDict["param"] = self.dataMenu
+        continueTitleMenuDict = {"choices": ["Python is boring...", "Gaming is meaningless...",
+                                        "STG is outdated...", "You are wasting time...",
+                                        "Gamers are Baka...",  "TP is tedious...",
+                                        "Are you giving up...", "Do you accept the defeat..."],
+                                 "choice": "Are you giving up...",
+                             "defaultClr": (200, 200, 200),
+                             "pos": (40, 150)}
+        continueYesMenuDict = {"choice": "Yes", "func": self.__init__,
+                             "defaultClr": (200, 200, 200),
+                             "focusClr": (255, 255, 255), "pos": (60, 250)}
+        continueNoMenuDict =  {"choice": "No", "func": self.continueGame, "param": 0,
+                         "defaultClr": (200, 200, 200),
+                         "focusClr": (255, 255, 255), "pos": (60, 280)}
+        self.continueMenu = (continueTitleMenuDict, continueYesMenuDict, continueNoMenuDict)
+        scoreBoardTitleMenuDict = {"choice": "High Score",
+                                 "defaultClr": (200, 200, 200),
+                                 "pos": (40, 150)}
+        self.highScoreMenu = [scoreBoardTitleMenuDict]
+        for i in range(5):
+            highscoreMenuDict = {"choice": "%d: 0"%(i+1),
+                                 "defaultClr": (200, 200, 200),
+                                 "focusClr": (255, 255, 255), "pos": (60, 250+i*30)}
+            self.highScoreMenu.append(highscoreMenuDict)
+        highscoreBackMenuDict = {"choice": "Back", "func": self.menu, "param": self.startingMenu, "defaultClr": (200, 200, 200),"focusClr": (255, 255, 255), "pos": (60, 400)}
+        self.highScoreMenu.append(highscoreBackMenuDict)
+        self.initHighScore()
+        scoreBoardMenuDict["param"] = self.highScoreMenu
+
+    def initHighScore(self):
+        d = fileIO.read(r".\data\score.dat")
+        if d is not None:
+            for i in range(5):
+                self.highScoreMenu[i+1]["choice"] = "%d: %d"%(i+1, d.get(str(i+1),0))
+
+
+    def continueGame(self,stage):
+        self.variableInit()
+        self.initGame(stage)
+
+    def loadUserData(self):
+        fileIO.write(fileIO.extractScripts(fileIO.walker()))
+        self.menu(self.startingMenu)
+
+    def deleteData(self):
+        fileIO.delete()
+        self.menu(self.startingMenu)
 
     def menu(self, choices):
         self.screen.fill((0, 0, 0))
@@ -47,16 +119,18 @@ class Main:
         self.num_choices = len(choices)
         # self.current_selection = 1
         self.current_menu = choices
+        self.currentMode = 0
         i = 0
         while i < self.num_choices:
             if pygame.font:
                 font = pygame.font.Font(None, 28)
+                choice = choices[i]["choice"]
+                if isinstance(choice, list):
+                    choice = random.choice(choice)
                 if self.current_selection == i:
-                    text = font.render(choices[i]["choice"], 1,
-                                       (choices[i]["focusClr"]))
+                    text = font.render(choice, 1, (choices[i]["focusClr"]))
                 else:
-                    text = font.render(choices[i]["choice"], 1,
-                                       (choices[i]["defaultClr"]))
+                    text = font.render(choice, 1, (choices[i]["defaultClr"]))
                 textpos = choices[i]["pos"]
                 self.screen.blit(text, textpos)
             i += 1
@@ -76,7 +150,7 @@ class Main:
         # TODO implement player shooting rate according to stage
         self.playerBulletData = {"vel": 20, "radius": 2, "fireRate": 2}
         self.playerData = {"lives": 3, "velFast": 5, "velSlow": 2,
-                           "bulletData": self.playerBulletData, "radius": 5}
+                           "bulletData": self.playerBulletData, "radius": 3}
         self.clock = pygame.time.Clock()
         self.hitboxGroup = pygame.sprite.Group()
         self.playerReprGroup = pygame.sprite.Group()
@@ -134,12 +208,14 @@ class Main:
                                              self.num_choices - 1)
                 self.menu(self.current_menu)
             elif event.key == K_z:
-                self.inMenu = False
-                self.screen.fill((0, 0, 0))
                 selection = self.current_menu[self.current_selection]
                 if "param" in selection:
+                    self.screen.fill((0, 0, 0))
+                    self.inMenu = False
                     selection["func"](selection["param"])
                 elif "func" in selection:
+                    self.screen.fill((0, 0, 0))
+                    self.inMenu = False
                     selection["func"]()
         elif self.playing and event.type == KEYDOWN and self.playerHitbox.movable:
             self.playerHitbox.keyDown(event.key)
@@ -147,14 +223,15 @@ class Main:
             self.playerHitbox.keyUp(event.key)
         pygame.display.update()
 
-    def initGame(self):
+    def initGame(self, stage=0):
         print("init Game...")
         self.inMenu = False
-        self.currentStage = 0
+        self.currentStage = stage
         self.screen.fill((0, 0, 0))
         # self.playerData = {"lives":3}
         self.initSpawnQueue()
         self.playerSpawn((self.playSizeX // 2, self.height + 80))
+        self.playerHitbox.lives = 3
         self.playing = True
         self.currentMode = 1
         # self.enemySpawn()
@@ -234,7 +311,15 @@ class Main:
             self.monsterBulletGroup.empty()
         if self.playerHitbox.dead:
             if self.playerHitbox.lives == 0:
-                self.__init__()
+                try:
+                    fileIO.writeScore(self.score)
+                except:
+                    print("failed to save score")
+                self.inMenu = True
+                self.playing = False
+                self.continueMenu[2]["param"] = self.currentStage
+                self.continueMenu[0]["choice"] = random.choice(self.continueMenu[0]["choices"])
+                self.menu(self.continueMenu)
             elif self.playerHitbox.spawnWaiting == self.playerHitbox.spawnWait:
                 self.monster.shooting = False
                 self.activePlayerEmitter()
@@ -262,16 +347,16 @@ class Main:
         if not self.inMenu:
             pygame.display.flip()
             self.screen.fill((0, 0, 0))
+            self.staminaBarGroup.draw(self.screen)
+            self.popUpGroup.draw(self.screen)
             if not self.playerHitbox.dead:
                 self.playerReprGroup.draw(self.screen)
                 self.hitboxGroup.draw(self.screen)
             self.playerBulletGroup.draw(self.screen)
+            self.particleSystem.draw(self.screen)
             self.monsterBulletGroup.draw(self.screen)
             self.monsterGroup.draw(self.screen)
-            self.particleSystem.draw(self.screen)
-            self.staminaBarGroup.draw(self.screen)
             self.sidebar.draw(self.screen)
-            self.popUpGroup.draw(self.screen)
             self.stageNameGroup.draw(self.screen)
 
 
@@ -282,11 +367,7 @@ class Main:
         playerHitBoxImgOrigin = pygame.Surface((radius * 2, radius * 2),
                                                pygame.SRCALPHA)
         self.playerData["playerHitBoxImgOrigin"] = playerHitBoxImgOrigin
-        playerHitBoxImg = pygame.Surface((radius * 2, radius * 2),
-                                         pygame.SRCALPHA)
-        pygame.draw.ellipse(playerHitBoxImg, (255, 255, 255),
-                            [0, 0, radius * 2, radius * 2])
-        self.playerData["playerHitBoxImgTrans"] = playerHitBoxImg
+        self.playerData["playerHitBoxImgTrans"] = playerHitBoxImgOrigin
         self.playerHitbox = sprites.PlayerHitBox(pos, self.playerData[
             "playerHitBoxImgOrigin"], self.playerData)
 
@@ -355,15 +436,9 @@ class Main:
                 self.stageNameGroup.empty()
                 if self.monster.dead:
                     self.currentMode = 1
-                    # self.monsterBulletGroup.empty()
-                    # self.monsterGroup.empty()
                     self.staminaBarGroup.empty()
                     self.stageNameGroup.empty()
 
-
-
-    def stageSpawn(self):
-        pass
 
     def on_cleanup(self):
         sys.exit()

@@ -3,7 +3,10 @@ import re
 import json
 
 
-def walker(path):
+class ValidationError(Exception):
+    pass
+
+def walker(path=r".\data"):
     fileList = [None] * 15
     for root, dirs, files in os.walk(path, topdown=False):
         for name in files:
@@ -19,6 +22,9 @@ def walker(path):
                 elif "driver" not in hwname:
                     fileList[int(num)] = [dict]
     # fileLIst: [[{}], [{}], ... [{},{},{}], ....]
+    fileList = [x for x in fileList if x is not None]
+    if len(fileList) < 10:
+        raise ValidationError(r"Please copy hw folders containing hw 1,2,3,4,5,6,8,9,10,11! into .\data")
     return fileList
 
 
@@ -27,12 +33,11 @@ def extractScripts(fileList):
     for f in fileList:
         if f is not None and isinstance(f, list):
             dict = {}
-            dict["scripts"] = [""] * 5
+            dict["scripts"] = [""] * 4
             for d in f:
                 dict["no"] = d["no"]
-                dict["name"] = d['name']
+                dict["name"] = d['name'].split("-")[0]
                 with open(d["path"], "r") as file:
-                    # scriptsList = [""] * 5
                     scripts = file.read()
                     poslist = [m.start() for m in
                                re.finditer("def .*:\n", scripts)]
@@ -42,8 +47,10 @@ def extractScripts(fileList):
                             continue
                         s = ' '.join(s.split())
                         s = s.replace("\n", " ").strip()
+                        # remove all white space!
+                        s = s.replace(" ","")
                         j = 0
-                        while j < 5:
+                        while j < 4:
                             if (len(s) > len(dict["scripts"][j])):
                                 # scriptsList.insert(j, s)
                                 # scriptsList.pop()
@@ -68,7 +75,7 @@ def check(file):
         return None, None
 
 
-def write(data, file):
+def write(data, file=r".\data\user.dat"):
     fout = open(file, 'w')
     sent_data = data
     dumped_json_string = json.dumps(sent_data)
@@ -85,6 +92,8 @@ def read(file):
             jsn = ''.join(chr(int(x, 2)) for x in binary_data.split())
             received_data = json.loads(jsn)
             return received_data
+    else:
+        return None
 
 
 def pretty(d, indent=0):
@@ -95,10 +104,37 @@ def pretty(d, indent=0):
         else:
             print('\t' * (indent + 1) + str(value))
 
+def delete(file=r".\data\user.dat"):
+    if os.path.exists(file):
+        os.remove(file)
+
+def writeScore(score):
+    path = r".\data\score.dat"
+    outDict = {}
+    if os.path.exists(path):
+        try:
+            s = read(path)
+            scores = list(s.values())
+            scores.append(score)
+            scores = list(sorted(scores, reverse=True))
+            if len(scores) > 5:
+                scores.pop()
+            for i in range(len(scores)):
+                outDict[str(i+1)] = scores[i]
+        except:
+            delete(path)
+            outDict = {1: score}
+            print("score file damaged")
+    else:
+        print("file don;t exist")
+        outDict = {1: score}
+    write(outDict, path)
+    pretty(read(path))
+
+
 
 if __name__ == '__main__':
-    # data = extractScripts(walker("."))
-    # pretty(data)
-    # write(data, r".\data\default.dat")
-    # pretty(read(r".\data\default.dat"))
-    pass
+    # print(walker(r".\data"))
+    data = extractScripts(walker(r".\data"))
+    write(data, r".\data\user.dat")
+    pretty(read(r".\data\user.dat"))
