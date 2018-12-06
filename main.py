@@ -268,7 +268,6 @@ class Main:
 
         self.enemySpawn()
 
-        # TODO integrate into plyer and monster class update()
         if self.playerHitbox.shooting:
             playerBullets = self.playerHitbox.shoot()
             if playerBullets is not None:
