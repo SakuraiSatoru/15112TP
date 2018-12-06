@@ -6,6 +6,7 @@ import json
 class ValidationError(Exception):
     pass
 
+
 def walker(path=r".\data"):
     fileList = [None] * 15
     for root, dirs, files in os.walk(path, topdown=False):
@@ -24,7 +25,8 @@ def walker(path=r".\data"):
     # fileLIst: [[{}], [{}], ... [{},{},{}], ....]
     fileList = [x for x in fileList if x is not None]
     if len(fileList) < 10:
-        raise ValidationError(r"Please copy hw folders containing hw 1,2,3,4,5,6,8,9,10,11! into .\data")
+        raise ValidationError(
+            r"Please copy hw folders containing hw 1,2,3,4,5,6,8,9,10,11! into .\data")
     return fileList
 
 
@@ -48,7 +50,7 @@ def extractScripts(fileList):
                         s = ' '.join(s.split())
                         s = s.replace("\n", " ").strip()
                         # remove all white space!
-                        s = s.replace(" ","")
+                        s = s.replace(" ", "")
                         j = 0
                         while j < 4:
                             if (len(s) > len(dict["scripts"][j])):
@@ -104,9 +106,11 @@ def pretty(d, indent=0):
         else:
             print('\t' * (indent + 1) + str(value))
 
+
 def delete(file=r".\data\user.dat"):
     if os.path.exists(file):
         os.remove(file)
+
 
 def writeScore(score):
     path = r".\data\score.dat"
@@ -120,7 +124,7 @@ def writeScore(score):
             if len(scores) > 5:
                 scores.pop()
             for i in range(len(scores)):
-                outDict[str(i+1)] = scores[i]
+                outDict[str(i + 1)] = scores[i]
         except:
             delete(path)
             outDict = {1: score}
@@ -132,9 +136,7 @@ def writeScore(score):
     pretty(read(path))
 
 
-
 if __name__ == '__main__':
-    # print(walker(r".\data"))
     data = extractScripts(walker(r".\data"))
     write(data, r".\data\user.dat")
     pretty(read(r".\data\user.dat"))

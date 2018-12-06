@@ -51,7 +51,7 @@
 	  <fire>
 	    <bullet>
 	      <direction type="relative">0</direction>
-	      <speed type="absolute">8</speed>
+	      <speed type="absolute">5</speed>
 	    </bullet>
 	  </fire>
 	  <wait>7</wait>
@@ -59,7 +59,7 @@
       </repeat>
       <changeSpeed>
 	<term>1</term>
-	<speed>8</speed>
+	<speed>5</speed>
       </changeSpeed>
     </action>
   </bullet>

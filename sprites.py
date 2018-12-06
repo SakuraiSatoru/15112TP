@@ -8,6 +8,7 @@ import copy
 import bulletml
 import helper
 
+
 class Sprite(pygame.sprite.Sprite):
     def __init__(self, centerPoint, image):
         pygame.sprite.Sprite.__init__(self)
@@ -38,7 +39,8 @@ class PlayerRepr(Sprite):
 
         self.playerReprImgTrans.blit(self.playerReprImgLeft, (1, 0))
         self.playerReprImgTrans.blit(self.playerReprImgRight, (12, 0))
-        pygame.gfxdraw.filled_circle(self.playerReprImgTrans, 13, 16, 4, (255,255,255))
+        pygame.gfxdraw.filled_circle(self.playerReprImgTrans, 13, 16, 4,
+                                     (255, 255, 255))
 
     def update(self, scr_size, center, trans=False):
         self.rect.center = center[0], center[1] - 4
@@ -85,7 +87,6 @@ class PlayerHitBox(Sprite):
         # self.pathSource.vanished = True
         self.pathActive.add(self.pathSource)
 
-
     def update(self, scr_size, bullets):
         if self.spawnDur > 0:
             self.shootable = False
@@ -112,10 +113,6 @@ class PlayerHitBox(Sprite):
             if self.spawnWaiting < 1:
                 self.respawn()
             return
-
-
-
-
 
         self.deltaMoveX = 0
         self.deltaMoveY = 0
@@ -272,11 +269,11 @@ class StageName(Sprite):
         font = pygame.font.Font(None, 24)
         text = font.render("Stage: " + self.name, True, (clr, clr, clr))
         self.image.blit(text, (
-        self.image.get_rect().width / 2 - text.get_rect().width / 2, 0))
+            self.image.get_rect().width / 2 - text.get_rect().width / 2, 0))
         font = pygame.font.Font(None, 18)
         text = font.render(self.descript, True, (clr, clr, clr))
         self.image.blit(text, (
-        self.image.get_rect().width / 2 - text.get_rect().width / 2, 24))
+            self.image.get_rect().width / 2 - text.get_rect().width / 2, 24))
 
         self.duration -= 10
         if self.duration < 0:
@@ -332,6 +329,7 @@ class popUp(StageName):
                 self.rect.center = self.newPath.x, self.newPath.y
                 self.newPath.step()
 
+
 class Monster(Sprite):
     def __init__(self, centerPoint, image, data):
         Sprite.__init__(self, centerPoint, image)
@@ -385,7 +383,7 @@ class Monster(Sprite):
                 self.newSpell = [True, self.getSpellName()]
             # # bullet hit monster
             for b in pygame.sprite.spritecollide(self, bullets, False):
-                self.damage(5)
+                self.damage(1)
                 b.kill()
                 hitcount[0] += 1
 
@@ -393,7 +391,6 @@ class Monster(Sprite):
             self.target.x, self.target.y = hitBoxPos
             if not hasattr(self, "bulletMLActive"):
                 return
-
 
             for obj in list(self.bulletMLActive):
                 new = obj.step()
@@ -417,7 +414,6 @@ class Monster(Sprite):
                             obj.repr):
                         monsterBulletGroup.remove(obj.repr)
 
-
     def pathInit(self, x=300, y=5):
         self.pathDoc = bulletml.BulletML.FromDocument(open(self.path, "rU"))
         self.pathActive = set()
@@ -433,7 +429,6 @@ class Monster(Sprite):
             max(self.currentSpellIndex, 0)]
 
     def bulletMLShoot(self):
-        print(self.script)
         self.bulletMLDoc = bulletml.BulletML.FromDocument(
             open(self.script, "rU"))
         self.bulletMLSource = bulletml.Bullet.FromDocument(self.bulletMLDoc,
@@ -490,7 +485,7 @@ class Monster(Sprite):
             self.bulletMLActive.clear()
             return
         elif (not hasattr(self, "bulletMLActive")) or (
-        not self.bulletMLActive):
+                not self.bulletMLActive):
             self.bulletMLShoot()
 
     def damage(self, bulletDamage):
@@ -513,8 +508,8 @@ class MonsterBullet(Sprite):
         self.vel = data["vel"]
         self.radius = data["radius"]
         self.text = data["text"]
-        self.tx = (1 - 2 ** 0.5 / 2) * self.rect.width
-        self.ty = (1 - 2 ** 0.5 / 2) * self.rect.height
+        self.tx = (1 - 2 ** 0.5 / 2) * self.rect.width + 1
+        self.ty = (1 - 2 ** 0.5 / 2) * self.rect.height - 1
         self.image.blit(self.text, (self.tx, self.ty))
 
     def pattern(self):
@@ -534,10 +529,11 @@ class SideBar(Sprite):
         #                  (5, 5, self.rect.width - 6, self.rect.height - 6), 1)
         # helper.filledRoundedRect(self.image, self.rect, (255,255,255), 0.2)
         helper.filledRoundedRect(self.image, (
-        8, 8, self.rect.width - 16, self.rect.height - 16), (255, 255, 255),
+            8, 8, self.rect.width - 16, self.rect.height - 16),
+                                 (255, 255, 255),
                                  0.2)
         helper.filledRoundedRect(self.image, (
-        9, 9, self.rect.width - 18, self.rect.height - 18), (0, 0, 0), 0.2)
+            9, 9, self.rect.width - 18, self.rect.height - 18), (0, 0, 0), 0.2)
         self.originImg = self.image.copy()
         self.stage = 1
         self.score = 0
@@ -548,13 +544,13 @@ class SideBar(Sprite):
         self.score = score
         self.lives = lives
         self.image = self.originImg.copy()
-        font = pygame.font.Font(None, 30)
+        font = pygame.font.Font(None, 25)
         text = font.render("Stage: %s" % self.stage, True, (255, 255, 255))
-        self.image.blit(text, (20, 40))
+        self.image.blit(text, (25, 80))
         text = font.render("Score: %s" % self.score, True, (255, 255, 255))
-        self.image.blit(text, (20, 100))
+        self.image.blit(text, (25, 140))
         text = font.render("Lives: %s" % self.lives, True, (255, 255, 255))
-        self.image.blit(text, (20, 160))
+        self.image.blit(text, (25, 200))
 
 
 class StaminaBar(Sprite):
@@ -604,4 +600,3 @@ class StaminaBar(Sprite):
                 (self.recoveryProgres, self.rect.height))
         currentBar.fill((255, 255, 255))
         self.image.blit(currentBar, pos)
-

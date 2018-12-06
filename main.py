@@ -13,6 +13,7 @@ import helper
 import fileIO
 import random
 
+
 class Main:
     def __init__(self):
         pygame.init()
@@ -36,72 +37,103 @@ class Main:
         startGameMenuDict = {"choice": "StartGame", "func": self.initGame,
                              "defaultClr": (200, 200, 200),
                              "focusClr": (255, 255, 255), "pos": (60, 250)}
-        tutorialMenuDict = {"choice": "Tutorial", "func": self.menu, "param": None, "defaultClr": (200, 200, 200),
-                             "focusClr": (255, 255, 255), "pos": (60, 280)}
-        dataMenuDict = {"choice": "User Data", "func": self.menu, "param": None, "defaultClr": (200, 200, 200),
-                             "focusClr": (255, 255, 255), "pos": (60, 310)}
-        scoreBoardMenuDict = {"choice": "High Score", "func": self.menu, "param": None, "defaultClr": (200, 200, 200),
-                             "focusClr": (255, 255, 255), "pos": (60, 340)}
+        tutorialMenuDict = {"choice": "Tutorial", "func": self.menu,
+                            "param": None, "defaultClr": (200, 200, 200),
+                            "focusClr": (255, 255, 255), "pos": (60, 280)}
+        dataMenuDict = {"choice": "User Data", "func": self.menu,
+                        "param": None, "defaultClr": (200, 200, 200),
+                        "focusClr": (255, 255, 255), "pos": (60, 310)}
+        scoreBoardMenuDict = {"choice": "High Score", "func": self.menu,
+                              "param": None, "defaultClr": (200, 200, 200),
+                              "focusClr": (255, 255, 255), "pos": (60, 340)}
         quitMenuDict = {"choice": "Quit", "func": sys.exit,
                         "defaultClr": (200, 200, 200),
                         "focusClr": (255, 255, 255), "pos": (60, 370)}
-        self.startingMenu = (titleMenuDict, startGameMenuDict, tutorialMenuDict, dataMenuDict, scoreBoardMenuDict, quitMenuDict)
-        tutorialTitleMenuDict = {"choice": "z - shoot    lshift - transform    arrow key - movement",
-                                 "defaultClr": (200, 200, 200),
-                                 "pos": (40, 150)}
-        tutorialBackMenuDict = {"choice": "Back", "func": self.menu, "param":self.startingMenu, "defaultClr": (200, 200, 200),
-                        "focusClr": (255, 255, 255), "pos": (60, 280)}
-        self.tutorialMenu = (tutorialTitleMenuDict, startGameMenuDict, tutorialBackMenuDict)
-        dataTitleMenuDict = {"choice": r"Copy folders containg all hwX.py into .\data folder",
-                                 "defaultClr": (200, 200, 200),
-                                 "pos": (40, 150)}
-        loadDataMenuDict =  {"choice": "Load Data", "func": self.loadUserData,
-                             "defaultClr": (200, 200, 200),
-                             "focusClr": (255, 255, 255), "pos": (60, 250)}
-        deleteDataMenuDict =  {"choice": "Delete User Data", "func": self.deleteData,
-                         "defaultClr": (200, 200, 200),
-                         "focusClr": (255, 255, 255), "pos": (60, 280)}
-        dataBackMenuDict = {"choice": "Back", "func": self.menu, "param":self.startingMenu, "defaultClr": (200, 200, 200),
-                                "focusClr": (255, 255, 255), "pos": (60, 310)}
-        self.dataMenu = (dataTitleMenuDict, loadDataMenuDict, deleteDataMenuDict, dataBackMenuDict)
+        self.startingMenu = (
+            titleMenuDict, startGameMenuDict, tutorialMenuDict, dataMenuDict,
+            scoreBoardMenuDict, quitMenuDict)
+        tutorialTitleMenuDict = {
+            "choice": "z - shoot    lshift - transform    arrow key - movement",
+            "defaultClr": (200, 200, 200),
+            "pos": (40, 150)}
+        tutorialBackMenuDict = {"choice": "Back", "func": self.menu,
+                                "param": self.startingMenu,
+                                "defaultClr": (200, 200, 200),
+                                "focusClr": (255, 255, 255), "pos": (60, 280)}
+        self.tutorialMenu = (
+            tutorialTitleMenuDict, startGameMenuDict, tutorialBackMenuDict)
+        dataTitleMenuDict = {
+            "choice": r"Copy folders containg all hwX.py into .\data folder",
+            "defaultClr": (200, 200, 200),
+            "pos": (40, 150)}
+        loadDataMenuDict = {"choice": "Load Data", "func": self.loadUserData,
+                            "defaultClr": (200, 200, 200),
+                            "focusClr": (255, 255, 255), "pos": (60, 250)}
+        deleteDataMenuDict = {"choice": "Delete User Data",
+                              "func": self.deleteData,
+                              "defaultClr": (200, 200, 200),
+                              "focusClr": (255, 255, 255), "pos": (60, 280)}
+        dataBackMenuDict = {"choice": "Back", "func": self.menu,
+                            "param": self.startingMenu,
+                            "defaultClr": (200, 200, 200),
+                            "focusClr": (255, 255, 255), "pos": (60, 310)}
+        self.dataMenu = (
+            dataTitleMenuDict, loadDataMenuDict, deleteDataMenuDict,
+            dataBackMenuDict)
         tutorialMenuDict["param"] = self.tutorialMenu
         dataMenuDict["param"] = self.dataMenu
-        continueTitleMenuDict = {"choices": ["Python is boring...", "Gaming is meaningless...",
-                                        "STG is outdated...", "You are wasting time...",
-                                        "Gamers are Baka...",  "TP is tedious...",
-                                        "Are you giving up...", "Do you accept the defeat..."],
-                                 "choice": "Are you giving up...",
-                             "defaultClr": (200, 200, 200),
-                             "pos": (40, 150)}
+        continueTitleMenuDict = {
+            "choices": ["Python is boring...", "Gaming is meaningless...",
+                        "STG is outdated...", "You are wasting time...",
+                        "Gamers are Baka...", "TP is tedious...",
+                        "Are you giving up...", "Do you accept the defeat..."],
+            "choice": "Are you giving up...",
+            "defaultClr": (200, 200, 200),
+            "pos": (40, 150)}
+        continueNoMenuDict = {"choice": "No", "func": self.continueGame,
+                              "param": 0,
+                              "defaultClr": (200, 200, 200),
+                              "focusClr": (255, 255, 255), "pos": (60, 250)}
         continueYesMenuDict = {"choice": "Yes", "func": self.__init__,
-                             "defaultClr": (200, 200, 200),
-                             "focusClr": (255, 255, 255), "pos": (60, 250)}
-        continueNoMenuDict =  {"choice": "No", "func": self.continueGame, "param": 0,
-                         "defaultClr": (200, 200, 200),
-                         "focusClr": (255, 255, 255), "pos": (60, 280)}
-        self.continueMenu = (continueTitleMenuDict, continueYesMenuDict, continueNoMenuDict)
+                               "defaultClr": (200, 200, 200),
+                               "focusClr": (255, 255, 255), "pos": (60, 280)}
+        self.continueMenu = (
+            continueTitleMenuDict, continueNoMenuDict, continueYesMenuDict)
         scoreBoardTitleMenuDict = {"choice": "High Score",
-                                 "defaultClr": (200, 200, 200),
-                                 "pos": (40, 150)}
+                                   "defaultClr": (200, 200, 200),
+                                   "pos": (40, 150)}
         self.highScoreMenu = [scoreBoardTitleMenuDict]
         for i in range(5):
-            highscoreMenuDict = {"choice": "%d: 0"%(i+1),
+            highscoreMenuDict = {"choice": "%d: 0" % (i + 1),
                                  "defaultClr": (200, 200, 200),
-                                 "focusClr": (255, 255, 255), "pos": (60, 250+i*30)}
+                                 "focusClr": (255, 255, 255),
+                                 "pos": (60, 250 + i * 30)}
             self.highScoreMenu.append(highscoreMenuDict)
-        highscoreBackMenuDict = {"choice": "Back", "func": self.menu, "param": self.startingMenu, "defaultClr": (200, 200, 200),"focusClr": (255, 255, 255), "pos": (60, 400)}
+        highscoreBackMenuDict = {"choice": "Back", "func": self.menu,
+                                 "param": self.startingMenu,
+                                 "defaultClr": (200, 200, 200),
+                                 "focusClr": (255, 255, 255), "pos": (60, 400)}
         self.highScoreMenu.append(highscoreBackMenuDict)
         self.initHighScore()
         scoreBoardMenuDict["param"] = self.highScoreMenu
+        clearTitleMenuDict = {
+            "choice": "Congrats! You are a master of STG and 112! Check high score.",
+            "defaultClr": (200, 200, 200),
+            "pos": (40, 150)}
+        clearBackMenuDict = {"choice": "back to menu", "func": self.menu,
+                             "param": self.startingMenu,
+                             "defaultClr": (200, 200, 200),
+                             "focusClr": (255, 255, 255), "pos": (60, 250)}
+        self.clearMenu = (clearTitleMenuDict, clearBackMenuDict)
 
     def initHighScore(self):
         d = fileIO.read(r".\data\score.dat")
         if d is not None:
             for i in range(5):
-                self.highScoreMenu[i+1]["choice"] = "%d: %d"%(i+1, d.get(str(i+1),0))
+                self.highScoreMenu[i + 1]["choice"] = "%d: %d" % (
+                    i + 1, d.get(str(i + 1), 0))
 
-
-    def continueGame(self,stage):
+    def continueGame(self, stage):
         self.variableInit()
         self.initGame(stage)
 
@@ -123,6 +155,7 @@ class Main:
         i = 0
         while i < self.num_choices:
             if pygame.font:
+                # font = pygame.font.Font(r".\fonts\CASTWO_ALT.ttf", 15)
                 font = pygame.font.Font(None, 28)
                 choice = choices[i]["choice"]
                 if isinstance(choice, list):
@@ -143,11 +176,8 @@ class Main:
         self.num_choices = 0
         self.score = 0
         self.clockTick = 60
-        # TODO Boss stamina bar
-        # self.staminaBarMax = self.staminaBarCur = self.width * 4/5
         self.current_menu = self.startingMenu
         self.playing = False
-        # TODO implement player shooting rate according to stage
         self.playerBulletData = {"vel": 20, "radius": 2, "fireRate": 2}
         self.playerData = {"lives": 3, "velFast": 5, "velSlow": 2,
                            "bulletData": self.playerBulletData, "radius": 3}
@@ -167,8 +197,7 @@ class Main:
         self.currentStage = 0
         # 0:menu 1: stagename 2:monster
         self.currentMode = 0
-
-
+        self.endingCountDown = 100
 
     def particleInit(self):
         # particle
@@ -192,8 +221,6 @@ class Main:
         self.particleSystem.add_emitter(self.playerDieEmitter,
                                         "playerDieEmitter")
         self.particleSystem.add_emitter(self.bossDieEmitter, "bossDieEmitter")
-
-
 
     def eventListener(self, event):
         pygame.event.pump()
@@ -236,14 +263,13 @@ class Main:
         self.currentMode = 1
         # self.enemySpawn()
 
-
     def inGameUpdate(self):
         self.clock.tick(self.clockTick)
 
         self.enemySpawn()
 
         # TODO integrate into plyer and monster class update()
-        if self.playerHitbox.shooting:  # and self.frameCount % self.playerBulletData["fireRate"]==0:
+        if self.playerHitbox.shooting:
             playerBullets = self.playerHitbox.shoot()
             if playerBullets is not None:
                 for b in playerBullets:
@@ -266,7 +292,8 @@ class Main:
                 self.staminaBarGroup.empty()
                 self.popUpGroup.empty()
                 self.currentMode = 1
-                self.currentStage += 1
+                self.currentStage = min(self.currentStage + 1,
+                                        len(self.stageList) - 1)
             elif monster.stamina < 1 and not self.monster.dead:
                 self.monsterBulletGroup.empty()
                 self.popUpGroup.empty()
@@ -274,6 +301,12 @@ class Main:
                     monster.stamina = monster.originStamina
                 if monster.immutable and monster.immutableCount == 0:
                     self.activateBossEmitter()
+            elif self.monster.dead and hasattr(self,
+                                               "playerHitbox") and self.playerHitbox.lives > 0 and self.currentStage == len(
+                    self.stageList) - 1:
+                self.playing = False
+                self.inMenu = True
+                self.menu(self.clearMenu)
             if monster.newSpell[0]:
                 self.popUpGroup.empty()
                 self.popUpGroup.add(
@@ -311,15 +344,23 @@ class Main:
             self.monsterBulletGroup.empty()
         if self.playerHitbox.dead:
             if self.playerHitbox.lives == 0:
-                try:
-                    fileIO.writeScore(self.score)
-                except:
-                    print("failed to save score")
-                self.inMenu = True
-                self.playing = False
-                self.continueMenu[2]["param"] = self.currentStage
-                self.continueMenu[0]["choice"] = random.choice(self.continueMenu[0]["choices"])
-                self.menu(self.continueMenu)
+                if self.endingCountDown == 100:
+                    self.activePlayerEmitter()
+                    self.monster.shooting = False
+                    self.endingCountDown -= 1
+                elif self.endingCountDown > 0:
+                    self.endingCountDown -= 1
+                else:
+                    try:
+                        fileIO.writeScore(self.score)
+                    except:
+                        print("failed to save score")
+                    self.inMenu = True
+                    self.playing = False
+                    self.continueMenu[1]["param"] = self.currentStage
+                    self.continueMenu[0]["choice"] = random.choice(
+                        self.continueMenu[0]["choices"])
+                    self.menu(self.continueMenu)
             elif self.playerHitbox.spawnWaiting == self.playerHitbox.spawnWait:
                 self.monster.shooting = False
                 self.activePlayerEmitter()
@@ -359,8 +400,6 @@ class Main:
             self.sidebar.draw(self.screen)
             self.stageNameGroup.draw(self.screen)
 
-
-
     def playerSpawn(self, pos):
         # Hitbox
         radius = self.playerData["radius"]
@@ -381,6 +420,7 @@ class Main:
         # self.playerHitbox.movable = True
 
     def initSpawnQueue(self):
+        print("initializing spawn queue...")
         self.stageList = [levels.Stage1(), levels.Stage2(), levels.Stage3(),
                           levels.Stage4(), levels.Stage5(), levels.Stage6(),
                           levels.Stage7(), levels.Stage8(), levels.Stage9(),
@@ -404,7 +444,6 @@ class Main:
                                                 (self.playSizeX - 30, 1)),
                                             staminaBarData)
             self.staminaBarList.append(staminaBar)
-        print("initialized queue")
 
     def enemySpawn(self):
         i = self.currentStage
@@ -438,7 +477,6 @@ class Main:
                     self.currentMode = 1
                     self.staminaBarGroup.empty()
                     self.stageNameGroup.empty()
-
 
     def on_cleanup(self):
         sys.exit()
