@@ -1,17 +1,19 @@
 # CMU 15112 Term Project
 # @author Zhihao Fang
 # code reference: https://www.pygame.org/project/937/1620
-import pygame
-from pygame.locals import *
-import sys
-import sprites
-import pygame.gfxdraw
-import levels
-import bulletml
-import libs.PAdLib.particles as particles
-import helper
-import fileIO
 import random
+import sys
+
+import pygame
+import pygame.gfxdraw
+from pygame.locals import *
+
+import fileIO
+import levels
+import libs.PAdLib.particles as particles
+import sprites
+from ai import aiTrain
+from ai import runwinner
 
 
 class Main:
@@ -46,12 +48,15 @@ class Main:
         scoreBoardMenuDict = {"choice": "High Score", "func": self.menu,
                               "param": None, "defaultClr": (200, 200, 200),
                               "focusClr": (255, 255, 255), "pos": (60, 340)}
+        aiMenuDict = {"choice": "Game Ai", "func": self.menu,
+                      "param": None, "defaultClr": (200, 200, 200),
+                      "focusClr": (255, 255, 255), "pos": (60, 370)}
         quitMenuDict = {"choice": "Quit", "func": sys.exit,
                         "defaultClr": (200, 200, 200),
-                        "focusClr": (255, 255, 255), "pos": (60, 370)}
+                        "focusClr": (255, 255, 255), "pos": (60, 400)}
         self.startingMenu = (
             titleMenuDict, startGameMenuDict, tutorialMenuDict, dataMenuDict,
-            scoreBoardMenuDict, quitMenuDict)
+            scoreBoardMenuDict, aiMenuDict, quitMenuDict)
         tutorialTitleMenuDict = {
             "choice": "z - shoot    lshift - transform    arrow key - movement",
             "defaultClr": (200, 200, 200),
@@ -125,6 +130,23 @@ class Main:
                              "defaultClr": (200, 200, 200),
                              "focusClr": (255, 255, 255), "pos": (60, 250)}
         self.clearMenu = (clearTitleMenuDict, clearBackMenuDict)
+        aiTitleMenuDict = {
+            "choice": "Watch or train ai to play",
+            "defaultClr": (200, 200, 200),
+            "pos": (40, 150)}
+        aiPlayMenuDict = {"choice": "Run ai", "func": runwinner.main,
+                          "defaultClr": (200, 200, 200),
+                          "focusClr": (255, 255, 255), "pos": (60, 250)}
+        aiTrainMenuDict = {"choice": "Train ai", "func": aiTrain.main,
+                           "defaultClr": (200, 200, 200),
+                           "focusClr": (255, 255, 255), "pos": (60, 280)}
+        aiBackMenuDict = {"choice": "back to menu", "func": self.menu,
+                          "param": self.startingMenu,
+                          "defaultClr": (200, 200, 200),
+                          "focusClr": (255, 255, 255), "pos": (60, 310)}
+        self.aiMenu = (
+            aiTitleMenuDict, aiPlayMenuDict, aiTrainMenuDict, aiBackMenuDict)
+        aiMenuDict["param"] = self.aiMenu
 
     def initHighScore(self):
         d = fileIO.read(r".\data\score.dat")
@@ -268,6 +290,7 @@ class Main:
 
         self.enemySpawn()
 
+        # TODO integrate into plyer and monster class update()
         if self.playerHitbox.shooting:
             playerBullets = self.playerHitbox.shoot()
             if playerBullets is not None:

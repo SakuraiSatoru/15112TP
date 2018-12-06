@@ -1,0 +1,29 @@
+<?xml version="1.0" ?>
+<bulletml type="vertical"
+          xmlns="http://www.asahi-net.or.jp/~cs8k-cyu/bulletml">
+    <action label="top">
+        <repeat>
+            <times>9999</times>
+            <action>
+                <fire>
+                    <direction type="absolute">360 * $rand</direction>
+                    <speed>3</speed>
+                    <bullet/>
+                </fire>
+                <wait>1</wait>
+                <fire>
+                    <direction type="absolute">360 * $rand</direction>
+                    <speed>3</speed>
+                    <bullet/>
+                </fire>
+                <wait>1</wait>
+                <fire>
+                    <direction type="absolute">360 * $rand</direction>
+                    <speed>3</speed>
+                    <bullet/>
+                </fire>
+                <wait>20</wait>
+            </action>
+        </repeat>
+    </action>
+</bulletml>

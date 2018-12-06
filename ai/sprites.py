@@ -1,10 +1,7 @@
-import copy
-import math
-
 import bulletml
+import neat
 import pygame
 import pygame.gfxdraw
-from pygame.locals import *
 
 import helper
 
@@ -35,204 +32,168 @@ class PlayerRepr(Sprite):
         self.playerReprImg.blit(self.playerReprImgLeft, (0, 0))
         self.playerReprImg.blit(self.playerReprImgRight, (13, 0))
         pygame.gfxdraw.circle(self.playerReprImg, 13, 16, 4, (255, 255, 255))
-        self.image = self.playerReprImg
 
         self.playerReprImgTrans.blit(self.playerReprImgLeft, (1, 0))
         self.playerReprImgTrans.blit(self.playerReprImgRight, (12, 0))
+        self.image = self.playerReprImgTrans
         pygame.gfxdraw.filled_circle(self.playerReprImgTrans, 13, 16, 4,
                                      (255, 255, 255))
 
     def update(self, scr_size, center, trans=False):
         self.rect.center = center[0], center[1] - 4
-        if trans and self.image == self.playerReprImg:
-            self.image = self.playerReprImgTrans
-        elif (not trans) and self.image == self.playerReprImgTrans:
-            self.image = self.playerReprImg
 
 
 class PlayerHitBox(Sprite):
-    def __init__(self, centerPoint, image, data):
+    def __init__(self, centerPoint, image, data, genome,
+                 config):
+        print("init player!")
         Sprite.__init__(self, centerPoint, image)
+
+        self.genome = genome
+        self.neural_network = neat.nn.FeedForwardNetwork.create(genome, config)
+        self.index = 0
+
+        self.fitness = 0
+
         self.originCenter = centerPoint
-        self.spawnWaiting = self.spawnWait = 50  # count down of hit towards respawn
-        self.spawnDur = 100  # count down of spawn movement
-        self.lives = data["lives"]
-        self.shooting = False
+        self.shooting = True
         self.shootable = True
-        self.movable = False
+        self.movable = True
         self.deltaMoveX = self.deltaMoveY = 0
-        self.vel = data["velFast"]
-        self.velFast = data["velFast"]
-        self.velSlow = data["velSlow"]
+        self.vel = data["velSlow"]
         self.radius = image.get_rect().size[0] // 2
         self.data = data
         self.bulletData = data["bulletData"]
         self.dead = False
-        self.originImg = data["playerHitBoxImgOrigin"]
-        self.transformImg = data["playerHitBoxImgTrans"]
-        self.transform = False
-        self.keyHold = []
+        self.image = data["playerHitBoxImgTrans"]
+        self.image.fill((255, 255, 255))
+        self.transform = True
         self.target = self.rect.center
-        self.newPath = None
-        self.pathInit(self.rect.centerx, self.rect.centery)
 
-    def pathInit(self, x=300, y=5):
-        pathDoc = bulletml.BulletML.FromDocument(
-            open(r".\scripts\0_1.xml", "rU"))
-        self.pathActive = set()
-        self.pathSource = bulletml.Bullet.FromDocument(pathDoc,
-                                                       x=x, y=y,
-                                                       target=self.target,
-                                                       rank=1)
-        # self.pathSource.vanished = True
-        self.pathActive.add(self.pathSource)
+    # check 8 directions
+    def checkDist(self, b):
+        sqDist = (b.rect.x - self.rect.x) ** 2 + (b.rect.y - self.rect.y) ** 2
+        if sqDist < 25:
+            raise Exception
+        if b.rect.y < self.rect.y and abs(b.rect.x - self.rect.x) < 8:
+            return (0, sqDist)
+        if self.rect.y > b.rect.y and self.rect.x > b.rect.x and abs(
+                self.rect.y - b.rect.y - self.rect.x + b.rect.x) < 8:
+            return (1, sqDist)
+        if self.rect.x > b.rect.x and abs(self.rect.y - b.rect.y) < 8:
+            return (2, sqDist)
+        if self.rect.x > b.rect.x and self.rect.y < b.rect.y and abs(
+                self.rect.x - b.rect.x - b.rect.y + self.rect.x) < 8:
+            return (3, sqDist)
+        if self.rect.y < b.rect.y and abs(self.rect.x - b.rect.x) < 8:
+            return (4, sqDist)
+        if self.rect.y < b.rect.y and self.rect.x < b.rect.x and abs(
+                b.rect.y - self.rect.y - b.rect.x + self.rect.x) < 8:
+            return (5, sqDist)
+        if self.rect.x < b.rect.x and abs(self.rect.y - b.rect.y) < 8:
+            return (6, sqDist)
+        if self.rect.x < b.rect.x and self.rect.y > b.rect.y and abs(
+                b.rect.x - self.rect.x - self.rect.y + b.rect.y) < 8:
+            return (7, sqDist)
+        return None
 
-    def update(self, scr_size, bullets):
-        if self.spawnDur > 0:
-            self.shootable = False
-            self.spawnDur -= 1
-            # make movement
-            if len(self.pathActive) > 0:
-                for path in list(self.pathActive):
-                    newPath = path.step()
-                    if len(newPath) > 0 and self.newPath is None:
-                        self.newPath = newPath[0]
-                        self.pathActive.clear()
-            if self.newPath is not None:
-                self.rect.center = self.newPath.x, self.newPath.y
-                self.newPath.step()
-        else:
-            self.movable = True
-            self.shootable = True
+    # check kNN
+    def checkKNN(self, bullets, k=5):
+        print("checking...")
+        dLst = [None] * k
+        rLst = []
+        for b in bullets:
+            sqDist = (b.rect.x - self.rect.x) ** 2 + (
+                    b.rect.y - self.rect.y) ** 2
+            if sqDist < 25:
+                raise Exception
+            i = 0
+            while i < k:
+                if dLst[i] is not None and sqDist > self.sqDistCal(dLst[i][0],
+                                                                   dLst[i][0],
+                                                                   self.rect.x,
+                                                                   self.rect.y):
+                    i += 1
+                else:
+                    dLst.insert(i, (
+                        b.rect.x - self.rect.x, b.rect.y - self.rect.y))
+                    dLst.pop()
+                    break
+        for d in dLst:
+            if d is not None:
+                rLst.append(d[0] * 10000 // 480)
+                rLst.append(d[1] * 10000 // 480)
+        while len(rLst) < k * 2:
+            rLst.append(0)
+        print(rLst)
+        return rLst
 
+    def sqDistCal(self, x1, y1, x2, y2):
+        return (x1 - x2) ** 2 + (y1 - y2) ** 2
+
+    def moveDecision(self, bullets, bossPos):
+        # algorithm 1, set .\ai\config input to 9
+        input = [10000] * 9
+        for b in bullets:
+            try:
+                d = self.checkDist(b)
+                if d is not None and input[d[0]] > d[1]:
+                    input[d[0]] = d[1]
+            except:
+                self.dead = True
+                self.kill()
+        input[8] = (self.rect.y - bossPos[1]) * 10000 // 480
+        # algorithm 1, set .\ai\config input to 9
+
+        # algorithm 2, set .\ai\config input to 12
+        # input = [10000] * 12
+        # try:
+        #     input = self.checkKNN(bullets)
+        # except:
+        #     print("dead")
+        #     self.dead = True
+        #     self.kill()
+        #
+        # if len(input) > 10:
+        #     input = input[:10]
+        # input.append((self.rect.x - bossPos[0]) * 10000 // 480)
+        # input.append(abs(self.rect.x - 240) * 10000 // 480)
+        # algorithm 2, set .\ai\config input to 12
+
+        # Setup the input layer
+        input = tuple(input)
+        print(input)
+
+        # Feed the neural network information
+        output = self.neural_network.activate(input)
+        # print("input:", input, "output:",output)
+
+        # Obtain Prediction
+        # output = (up,left,down.right)
+        if output[0] > 0.5:
+            self.deltaMoveY -= self.vel
+        if output[1] > 0.5:
+            self.deltaMoveX -= self.vel
+        if output[2] > 0.5:
+            self.deltaMoveY += self.vel
+        if output[3] > 0.5:
+            self.deltaMoveX += self.vel
+
+    def update(self, scr_size, bullets, bossPos):
         if self.dead:
-            self.shootable = False
-            self.movable = False
-            if self.lives > 0:
-                self.spawnWaiting -= 1
-            if self.spawnWaiting < 1:
-                self.respawn()
             return
-
         self.deltaMoveX = 0
         self.deltaMoveY = 0
-        self.vel = self.velFast
-        self.transform = False
-        if K_LSHIFT in self.keyHold:
-            self.transform = True
-            self.vel = self.velSlow
-        if K_UP in self.keyHold:
-            self.deltaMoveY -= self.vel
-        if K_DOWN in self.keyHold:
-            self.deltaMoveY += self.vel
-        if K_LEFT in self.keyHold:
-            self.deltaMoveX -= self.vel
-        if K_RIGHT in self.keyHold:
-            self.deltaMoveX += self.vel
-        if K_z in self.keyHold:
-            self.shooting = True
-        else:
-            self.shooting = False
+        self.moveDecision(bullets, bossPos)
+        self.fitness += len(bullets)
+        if abs(self.rect.x - bossPos[0]) < 25:
+            self.fitness += 5000
 
-        if self.transform and self.image == self.originImg:
-            self.image = self.transformImg
-        elif (not self.transform and self.image == self.transformImg):
-            self.image = self.originImg
+        self.movable = True
 
         if self.movable:
             self.rect.move_ip(self.deltaMoveX, self.deltaMoveY)
             self.rect.clamp_ip(scr_size)
-
-        if self.lives < 1:
-            self.movable = False
-            self.shooting = False
-            self.kill()
-
-        for b in pygame.sprite.spritecollide(self, bullets, False):
-            self.dead = True
-            self.lives -= 1
-            b.kill()
-            self.kill()
-
-    def keyDown(self, key):
-        if key not in self.keyHold:
-            self.keyHold.append(key)
-
-    def keyUp(self, key):
-        if key in self.keyHold:
-            self.keyHold.remove(key)
-
-    def shoot(self):
-        if self.lives < 1:
-            self.shooting = False
-            return None
-        elif self.shootable:
-            x, y, width, height = self.rect
-            x += (width / 2)
-            ctrpt = x, y
-            playerBulletImg = pygame.Surface(
-                (self.bulletData["radius"] * 2, self.bulletData["radius"] * 2),
-                pygame.SRCALPHA)
-            pygame.draw.ellipse(playerBulletImg, (255, 255, 255),
-                                [0, 0, self.bulletData["radius"] * 2,
-                                 self.bulletData["radius"] * 2], 0)
-            # pygame.gfxdraw.filled_circle(playerBulletImg, self.bulletData["radius"], self.bulletData["radius"], self.bulletData["radius"], (255, 255, 255))
-
-            bulletPosLst = self.getBulletPos()
-            bulletList = []
-            for i in range(len(bulletPosLst)):
-                bulletData = copy.deepcopy(self.bulletData)
-                if self.transform:
-                    bulletData["angle"] = self.bulletData["slowAngleList"][i]
-                else:
-                    bulletData["angle"] = self.bulletData["fastAngleList"][i]
-                newBullet = PlayerBullet(bulletPosLst[i], playerBulletImg,
-                                         bulletData)
-                bulletList.append(newBullet)
-            return bulletList
-        return None
-
-    def getBulletPos(self):
-        if not self.transform:
-            lst = self.bulletData["fastAngleList"]
-        else:
-            lst = self.bulletData["slowAngleList"]
-        returnLst = []
-        offset = 2
-        if len(lst) % 2 > 0 and 0 in lst:
-            returnLst.append(self.rect.center)
-            offset = 4
-        for i in reversed(range(len(lst) // 2)):
-            if lst[i] == 0:
-                returnLst.insert(0, (
-                    self.rect.centerx - offset, self.rect.centery))
-                returnLst.append(
-                    (self.rect.centerx + offset, self.rect.centery))
-                offset += 4
-            else:
-                returnLst.insert(0, self.rect.center)
-                returnLst.append(self.rect.center)
-        return returnLst
-
-    def respawn(self):
-        self.data["lives"] -= 1
-        self.__init__(self.originCenter, self.data["playerHitBoxImgOrigin"],
-                      self.data)
-
-
-class PlayerBullet(Sprite):
-    def __init__(self, centerPoint, image, data):
-        Sprite.__init__(self, centerPoint, image)
-        self.vel = data["vel"]
-        self.radius = data["radius"]
-        self.angle = data["angle"]
-        self.deltaMoveX = math.cos(math.radians(self.angle + 90)) * self.vel
-        self.deltaMoveY = - math.sin(math.radians(self.angle + 90)) * self.vel
-
-    def update(self):
-        self.rect.move_ip(self.deltaMoveX, self.deltaMoveY)
-        if self.rect.bottom < 0:
-            self.kill()
 
 
 class StageName(Sprite):
@@ -275,7 +236,7 @@ class StageName(Sprite):
         self.image.blit(text, (
             self.image.get_rect().width / 2 - text.get_rect().width / 2, 24))
 
-        self.duration -= 10
+        self.duration -= 50
         if self.duration < 0:
             self.dead = True
             self.kill()
@@ -343,18 +304,18 @@ class Monster(Sprite):
         self.target = bulletml.Bullet()
         self.target.x, self.target.y = self.rect.centerx, self.rect.centery + 200
         self.immutable = True
-        self.immutableDur = 100
+        self.immutableDur = 2
         self.immutableCount = 0
         self.spellNum = data["spellNum"]
-        self.currentSpellIndex = -1
+        self.currentSpellIndex = 0
         self.bulletMLInit()
         self.newPath = None
         self.pathInit(self.rect.centerx, self.rect.centery)
-        self.generator = self.getBulletChar()
+        # self.generator = self.getBulletChar()
         # indicator of new popUp
         self.newSpell = [False, ""]
 
-    def update(self, bullets, hitcount, monsterBulletGroup, hitBoxPos):
+    def update(self, monsterBulletGroup, hitBoxPos):
         # make movement
         if len(self.pathActive) > 0:
             for path in list(self.pathActive):
@@ -371,21 +332,12 @@ class Monster(Sprite):
             self.immutable = True
             self.immutableCount = 0
         else:
-            if self.immutable and self.immutableCount < self.immutableDur:
-                self.immutableCount += 1
-                self.shooting = False
-            elif self.immutable:
-                self.immutableCount = 0
-                if self.currentSpellIndex < 0:
-                    self.currentSpellIndex = 0
-                self.immutable = False
-                self.shooting = True
-                self.newSpell = [True, self.getSpellName()]
-            # # bullet hit monster
-            for b in pygame.sprite.spritecollide(self, bullets, False):
-                self.damage(1)
-                b.kill()
-                hitcount[0] += 1
+            if self.currentSpellIndex < 0:
+                self.currentSpellIndex = 0
+            self.immutable = False
+            self.shooting = True
+            self.newSpell = [True, self.getSpellName()]
+            self.damage(0.4)
 
             # handle bullets
             self.target.x, self.target.y = hitBoxPos
@@ -429,7 +381,6 @@ class Monster(Sprite):
             max(self.currentSpellIndex, 0)]
 
     def bulletMLShoot(self):
-        print(self.script)
         self.bulletMLDoc = bulletml.BulletML.FromDocument(
             open(self.script, "rU"))
         self.bulletMLSource = bulletml.Bullet.FromDocument(self.bulletMLDoc,
@@ -437,8 +388,6 @@ class Monster(Sprite):
                                                            y=self.rect.centery,
                                                            target=self.target,
                                                            rank=0.2)
-        # self.bulletMLSource.repr = self.getBulletRepr()
-        # self.bulletMLActive.add([self.bulletMLSource])
         self.bulletMLActive = set([self.bulletMLSource])
         self.bulletMLSource.vanished = True
         # return self.target, self.bulletMLActive
@@ -454,26 +403,7 @@ class Monster(Sprite):
         pygame.draw.ellipse(monsterBulletImg, (255, 255, 255),
                             [0, 0, self.bulletData["radius"] * 2,
                              self.bulletData["radius"] * 2], 1)
-        # bullet text
-        # font = pygame.font.Font("./fonts/monotxt.ttf",
-        #                         self.bulletData["fontSize"])
-        font = pygame.font.Font(None, self.bulletData["fontSize"])
-        text = font.render(next(self.generator), True, (255, 255, 255))
-        self.bulletData["text"] = text
         return MonsterBullet(ctrpt, monsterBulletImg, self.bulletData)
-
-    def getBulletChar(self):
-        i = 0
-        prev = self.currentSpellIndex
-        while True:
-            if prev != self.currentSpellIndex:
-                i = 0
-                prev = self.currentSpellIndex
-            c = self.bulletData["pyScripts"][self.currentSpellIndex][i]
-            if c != " ":
-                yield c
-            i = (i + 1) % len(
-                self.bulletData["pyScripts"][self.currentSpellIndex])
 
     def getSpellName(self):
         s = self.bulletData["pyScripts"][self.currentSpellIndex].split("(")[0][
@@ -508,16 +438,11 @@ class MonsterBullet(Sprite):
         self.deltaMoveY = 0
         self.vel = data["vel"]
         self.radius = data["radius"]
-        self.text = data["text"]
-        self.tx = (1 - 2 ** 0.5 / 2) * self.rect.width + 1
-        self.ty = (1 - 2 ** 0.5 / 2) * self.rect.height - 1
-        self.image.blit(self.text, (self.tx, self.ty))
 
     def pattern(self):
         pass
 
     def update(self, scr_rect):
-        # self.rect.move_ip(self.deltaMoveX, self.deltaMoveY)
         if self.rect.bottom < 0 or self.rect.top > scr_rect.size[
             1] or self.rect.left > scr_rect.size[0] or self.rect.right < 0:
             self.kill()
@@ -526,9 +451,6 @@ class MonsterBullet(Sprite):
 class SideBar(Sprite):
     def __init__(self, centerPoint, image):
         Sprite.__init__(self, centerPoint, image)
-        # pygame.draw.rect(image, (255, 255, 255),
-        #                  (5, 5, self.rect.width - 6, self.rect.height - 6), 1)
-        # helper.filledRoundedRect(self.image, self.rect, (255,255,255), 0.2)
         helper.filledRoundedRect(self.image, (
             8, 8, self.rect.width - 16, self.rect.height - 16),
                                  (255, 255, 255),
@@ -537,29 +459,16 @@ class SideBar(Sprite):
             9, 9, self.rect.width - 18, self.rect.height - 18), (0, 0, 0), 0.2)
         self.originImg = self.image.copy()
         self.stage = 1
-        self.score = 0
-        self.lives = 0
 
-    def update(self, stage, score, lives):
+    def update(self, stage):
         self.stage = stage
-        self.score = score
-        self.lives = lives
         self.image = self.originImg.copy()
         font = pygame.font.Font(None, 25)
         text = font.render("Stage: %s" % self.stage, True, (255, 255, 255))
         self.image.blit(text, (25, 80))
-        text = font.render("Score: %s" % self.score, True, (255, 255, 255))
-        self.image.blit(text, (25, 140))
-        text = font.render("Lives: %s" % self.lives, True, (255, 255, 255))
-        self.image.blit(text, (25, 200))
 
 
 class StaminaBar(Sprite):
-    # dict data:
-    #     int spellCount
-    #     int originStamina
-    #     int width: default cell width
-    #     int margin
     def __init__(self, centerPoint, image, data):
         Sprite.__init__(self, centerPoint, image)
         self.img = self.image.copy()
